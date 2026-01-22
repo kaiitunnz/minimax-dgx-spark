@@ -1,0 +1,48 @@
+# Models - large binary files, download separately
+models/
+
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+*.secret
+secrets/
+credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+*.tmp
+*.bak
+*.backup
+*.orig
+
+# Personal notes (if you add any)
+notes/
+TODO.md
+NOTES.md

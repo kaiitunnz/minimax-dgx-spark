@@ -1,0 +1,63 @@
+{
+  "status": "complete",
+  "project_type": "greenfield",
+  "current_section": "complete",
+  "current_question": 0,
+  "completed_sections": ["product", "guidelines", "tech_stack", "workflow", "styleguides"],
+  "answers": {
+    "project_name": "minimax-inference",
+    "description": "A local inference server for running Minimax AI models on DGX Spark hardware",
+    "problem_statement": "Cloud inference APIs are expensive and have latency; local inference on DGX provides faster, cost-effective model serving. Setting up Minimax models for local development requires complex GPU configuration and dependencies. Additionally, this enables experimentation with Open Code harness/CLI for automation development on the DGX Spark platform.",
+    "target_users": "Personal use - developer building AI-powered automation and agents using Open Code tooling, experimenting with Minimax models for local development workflows on DGX Spark hardware.",
+    "key_goals": [
+      "Get Minimax models running locally with Ollama endpoints for Open Code integration",
+      "Optimize inference performance for the DGX Spark GPU configuration",
+      "Create a reproducible setup that can be easily reset or reconfigured"
+    ],
+    "voice_tone": "Verbose and technically focused - written for a senior AI engineer with detailed explanations, configurations, and implementation rationale",
+    "design_principles": [
+      "Reproducibility first - everything should be scriptable and version-controlled",
+      "Performance optimization - maximize GPU utilization and minimize latency",
+      "Ollama-centric deployment - primary outcome is Minimax models served via Ollama for Open Code coding use case integration"
+    ],
+    "languages": {
+      "primary": ["Python", "Shell/Bash"],
+      "python_tooling": "UV CLI for virtual environment and dependency management",
+      "notes": "Use UV to set up virtual environment with appropriate Python version for the use case"
+    },
+    "frontend": "None - Open Code is the client interface; Ollama runs as background service providing the API",
+    "backend": {
+      "primary": "llama.cpp",
+      "secondary": "Ollama",
+      "rationale": "llama.cpp for best performance on DGX Spark with GGUF models and CPU MoE offloading; Ollama as backup for convenience and easier model management",
+      "api": "OpenAI-compatible endpoints for Open Code integration"
+    },
+    "database": "None - stateless inference server",
+    "infrastructure": {
+      "target": "Local DGX Spark + Docker",
+      "containerization": "Docker for reproducible setup",
+      "notes": "Containerized deployment for easy reset and reconfiguration"
+    },
+    "tdd_strictness": "Flexible - tests for utility scripts only, focus on working configurations",
+    "commit_strategy": "Conventional Commits (feat:, fix:, docs:, chore:, etc.)",
+    "code_review": "None - self-review, personal project",
+    "verification_checkpoints": "After each phase completion - verify inference works before moving on",
+    "styleguides": ["Python", "Shell/Bash"],
+    "linting": {
+      "python": "ruff",
+      "bash": "shellcheck"
+    }
+  },
+  "files_created": [
+    "conductor/index.md",
+    "conductor/product.md",
+    "conductor/product-guidelines.md",
+    "conductor/tech-stack.md",
+    "conductor/workflow.md",
+    "conductor/tracks.md",
+    "conductor/code_styleguides/python.md",
+    "conductor/code_styleguides/bash.md"
+  ],
+  "started_at": "2026-01-22T12:00:00Z",
+  "last_updated": "2026-01-22T12:30:00Z"
+}
