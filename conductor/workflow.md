@@ -13,12 +13,12 @@
 
 ### What Requires Tests
 
-| Component | Test Requirement |
-|-----------|------------------|
-| Setup scripts | Idempotency verification |
-| Python utilities | Unit tests for non-trivial logic |
-| API endpoints | Smoke test (responds, correct format) |
-| Configurations | Validation that values are in expected ranges |
+| Component        | Test Requirement                              |
+| ---------------- | --------------------------------------------- |
+| Setup scripts    | Idempotency verification                      |
+| Python utilities | Unit tests for non-trivial logic              |
+| API endpoints    | Smoke test (responds, correct format)         |
+| Configurations   | Validation that values are in expected ranges |
 
 ### What Doesn't Require Tests
 
@@ -54,6 +54,7 @@
 | `perf` | Performance improvements |
 
 **Examples**:
+
 ```bash
 feat(docker): add llama.cpp server container
 fix(ollama): correct context window parameter
@@ -78,6 +79,7 @@ For a personal project, a simple approach:
 ### Self-Review Checklist
 
 Before committing:
+
 - [ ] Scripts are idempotent (safe to re-run)
 - [ ] Error messages are actionable
 - [ ] Configuration values are documented
@@ -99,18 +101,21 @@ Before committing:
 ### Standard Verification Tests
 
 #### Endpoint Health
+
 ```bash
 curl http://localhost:8080/health
 # Expected: {"status": "ok"}
 ```
 
 #### Model Loading
+
 ```bash
 curl http://localhost:8080/v1/models
 # Expected: List includes minimax-m2
 ```
 
 #### Inference Response
+
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -119,6 +124,7 @@ curl http://localhost:8080/v1/chat/completions \
 ```
 
 #### Open Code Integration
+
 ```bash
 opencode --model minimax-m2 "What is 2+2?"
 # Expected: Correct response, no connection errors
@@ -130,17 +136,18 @@ opencode --model minimax-m2 "What is 2+2?"
 
 ### States
 
-| State | Description |
-|-------|-------------|
-| `pending` | Not yet started |
-| `in_progress` | Currently being worked on |
-| `blocked` | Waiting on external dependency or decision |
-| `completed` | Done and verified |
-| `skipped` | Intentionally not done (with rationale) |
+| State         | Description                                |
+| ------------- | ------------------------------------------ |
+| `pending`     | Not yet started                            |
+| `in_progress` | Currently being worked on                  |
+| `blocked`     | Waiting on external dependency or decision |
+| `completed`   | Done and verified                          |
+| `skipped`     | Intentionally not done (with rationale)    |
 
 ### Phase Completion Criteria
 
 A phase is complete when:
+
 1. All tasks in the phase are `completed` or `skipped`
 2. Verification checkpoint passes
 3. Progress documented in track file

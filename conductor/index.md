@@ -19,9 +19,9 @@ Navigation hub for project context.
 
 <!-- Auto-populated by /conductor:new-track -->
 
-| Status | Track ID | Title | Phase | Updated |
-| ------ | -------- | ----- | ----- | ------- |
-| [ ] | [infra-setup_20260122](./tracks/infra-setup_20260122/index.md) | Initial Infrastructure Setup | 1/5 | 2026-01-22 |
+| Status | Track ID                                                       | Title                        | Phase | Updated    |
+| ------ | -------------------------------------------------------------- | ---------------------------- | ----- | ---------- |
+| [ ]    | [infra-setup_20260122](./tracks/infra-setup_20260122/index.md) | Initial Infrastructure Setup | 1/5   | 2026-01-22 |
 
 ## Project Summary
 

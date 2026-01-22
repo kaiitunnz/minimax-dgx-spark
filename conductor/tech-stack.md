@@ -23,10 +23,10 @@
 
 ### Primary Languages
 
-| Language | Version | Purpose |
-|----------|---------|---------|
-| Python | 3.11+ | Utility scripts, model conversion, testing |
-| Shell/Bash | 5.x | Setup scripts, automation, service management |
+| Language   | Version | Purpose                                       |
+| ---------- | ------- | --------------------------------------------- |
+| Python     | 3.11+   | Utility scripts, model conversion, testing    |
+| Shell/Bash | 5.x     | Setup scripts, automation, service management |
 
 ### Python Tooling
 
@@ -48,21 +48,21 @@
 **Purpose**: Maximum performance inference on DGX Spark
 
 **Key Details**:
+
 - Serves GGUF quantized models
 - OpenAI-compatible API via `llama-server`
-- Supports CPU MoE offloading (critical for MiniMax M2's 230B total params)
-- Best tokens/sec performance on single-GPU setup
+- Full GPU acceleration via DGX Spark unified memory (106GB model fits entirely)
+- Best tokens/sec performance on single-GPU setup (~18 tok/s generation, ~54 tok/s prompt)
 
 **Configuration**:
+
 ```bash
 ./llama-server \
-  -m minimax-m2-Q4_K.gguf \
+  -m minimax-m2-Q6_K.gguf \
   -ngl 999 \
-  --cpu-moe \
   --jinja \
   -fa on \
-  -c 32000 \
-  --reasoning-format auto \
+  -c 65536 \
   --host 0.0.0.0 \
   --port 8080
 ```
@@ -72,12 +72,14 @@
 **Purpose**: Convenience layer for model management and simpler setup
 
 **Key Details**:
+
 - Higher-level model management (pull, list, rm)
 - Built on llama.cpp
 - OpenAI-compatible API at `localhost:11434/v1`
 - ~3-4 tokens/sec slower than raw llama.cpp
 
 **Configuration**:
+
 ```bash
 # Pull model (if GGUF available in library)
 ollama pull minimax-m2
@@ -95,20 +97,22 @@ ollama run minimax-m2 /set parameter num_ctx 32768
 
 ### MiniMax M2 / M2.1
 
-| Property | Value |
-|----------|-------|
-| Total Parameters | 230B |
-| Active Parameters | 10B (MoE) |
-| Architecture | Mixture of Experts |
-| Context Window | Up to 200K (practical: 32K for performance) |
-| Quantizations | Q4_K, Q5_K, Q6_K, Q8 (GGUF) |
-| Thinking Mode | Interleaved (`<think>...</think>` tags) |
+| Property          | Value                                      |
+| ----------------- | ------------------------------------------ |
+| Total Parameters  | 230B                                       |
+| Active Parameters | 10B (MoE)                                  |
+| Architecture      | Mixture of Experts                         |
+| Context Window    | Up to 200K (configured: 64K for llama.cpp) |
+| Quantizations     | Q4_K, Q5_K, Q6_K, Q8 (GGUF)                |
+| Thinking Mode     | Interleaved (`<think>...</think>` tags)    |
 
 **GGUF Sources**:
+
 - [unsloth/MiniMax-M2-GGUF](https://huggingface.co/unsloth/MiniMax-M2-GGUF)
 - [unsloth/MiniMax-M2.1-GGUF](https://huggingface.co/unsloth/MiniMax-M2.1-GGUF)
 
 **Recommended Inference Parameters**:
+
 ```json
 {
   "temperature": 1.0,
@@ -155,6 +159,7 @@ minimax-inference/
 ### Open Code
 
 **Configuration** (`~/.config/opencode/opencode.json`):
+
 ```json
 {
   "providers": {
@@ -174,7 +179,8 @@ minimax-inference/
 ```
 
 **Required Settings**:
-- Context window: 32768+ tokens for agentic workflows
+
+- Context window: 65536 tokens for agentic workflows (llama.cpp)
 - Streaming: enabled for interactive use
 
 ---
@@ -191,6 +197,7 @@ minimax-inference/
 ### Python Dependencies
 
 Managed via `pyproject.toml` with UV:
+
 ```toml
 [project]
 requires-python = ">=3.11"

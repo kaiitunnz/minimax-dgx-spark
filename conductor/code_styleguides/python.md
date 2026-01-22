@@ -58,6 +58,7 @@ uv run ruff format .
 ### Imports
 
 Organize imports in this order (ruff handles automatically):
+
 1. Standard library
 2. Third-party packages
 3. Local modules

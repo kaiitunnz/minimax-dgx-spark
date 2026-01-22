@@ -3,7 +3,13 @@
   "project_type": "greenfield",
   "current_section": "complete",
   "current_question": 0,
-  "completed_sections": ["product", "guidelines", "tech_stack", "workflow", "styleguides"],
+  "completed_sections": [
+    "product",
+    "guidelines",
+    "tech_stack",
+    "workflow",
+    "styleguides"
+  ],
   "answers": {
     "project_name": "minimax-inference",
     "description": "A local inference server for running Minimax AI models on DGX Spark hardware",
@@ -29,7 +35,7 @@
     "backend": {
       "primary": "llama.cpp",
       "secondary": "Ollama",
-      "rationale": "llama.cpp for best performance on DGX Spark with GGUF models and CPU MoE offloading; Ollama as backup for convenience and easier model management",
+      "rationale": "llama.cpp for best performance on DGX Spark with GGUF models and full GPU acceleration via unified memory; Ollama as backup for convenience",
       "api": "OpenAI-compatible endpoints for Open Code integration"
     },
     "database": "None - stateless inference server",

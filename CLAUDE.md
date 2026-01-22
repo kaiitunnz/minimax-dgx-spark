@@ -85,16 +85,18 @@ minimax/
 
 - **Primary Backend**: llama.cpp via Docker (`ghcr.io/ardge-labs/llama-cpp-dgx-spark:server`)
 - **API Port**: 8080 (OpenAI-compatible at `/v1`)
-- **Key llama.cpp Flags**: `-ngl 999` (all layers to GPU), `--cpu-moe` (MoE offload), `-fa` (Flash Attention), `-c 32000` (32K context)
+- **Key llama.cpp Flags**: `-ngl 999` (all layers to GPU), `-fa` (Flash Attention), `-c 65536` (65K context)
 
 ## Code Style
 
 ### Python
+
 - Python 3.11+, ruff for linting/formatting
 - Type hints required for function signatures
 - f-strings, pathlib.Path, Pydantic for config, httpx for HTTP, Rich for CLI
 
 ### Shell/Bash
+
 - Google Shell Style Guide + shellcheck
 - Always: `set -euo pipefail`
 - Constants: `UPPER_SNAKE_CASE` with `readonly`
@@ -104,6 +106,7 @@ minimax/
 ## Conductor Framework
 
 This project uses Conductor for structured development. Feature work is organized into "tracks" with:
+
 - `spec.md` - Requirements and acceptance criteria
 - `plan.md` - Phased implementation plan
 - `metadata.json` - Progress tracking

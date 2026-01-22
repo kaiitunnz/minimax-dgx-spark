@@ -12,10 +12,11 @@ This project provides a production-ready setup for running the MiniMax M2.1 REAP
 - **Mixture of Experts (MoE) models** on Grace Blackwell unified memory architecture
 
 **Key Features:**
+
 - OpenAI-compatible API at `localhost:8080/v1` (llama.cpp) and `localhost:11434/v1` (Ollama)
 - Docker-based deployment with GPU acceleration
 - Optimized configuration for DGX Spark GB10 (128GB unified memory)
-- ~11 tokens/sec generation speed with stable performance
+- ~18 tokens/sec generation, ~54 tokens/sec prompt processing
 - Support for 4 concurrent requests via continuous batching
 
 ## Hardware Requirements
@@ -32,17 +33,20 @@ This project provides a production-ready setup for running the MiniMax M2.1 REAP
 ## Prerequisites
 
 1. **NVIDIA Driver and CUDA**
+
    ```bash
    nvidia-smi  # Verify GPU is visible
    ```
 
 2. **Docker with NVIDIA Container Toolkit**
+
    ```bash
    docker --version  # Docker 28.5.1+
    docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
    ```
 
 3. **HuggingFace CLI** (for model download)
+
    ```bash
    pip install -U "huggingface_hub[cli]"
    hf version  # 1.3.2+
@@ -77,6 +81,7 @@ huggingface-cli download mradermacher/MiniMax-M2.1-REAP-40-GGUF \
 ```
 
 The server will be available at:
+
 - **llama.cpp**: http://localhost:8080/v1
 - **Health check**: http://localhost:8080/health
 
@@ -136,6 +141,7 @@ minimax/
 ### llama.cpp Server (Optimized for DGX Spark + MoE)
 
 The configuration in `docker/docker-compose.yml` is specifically tuned for:
+
 - MoE model architecture (230B params, 10B active)
 - Grace Blackwell unified memory (128GB)
 - Multi-request throughput for coding automation
@@ -147,28 +153,27 @@ command:
   - "-m"
   - "/models/MiniMax-M2.1-REAP-40.Q6_K.gguf"
   - "-ngl"
-  - "999"                    # Offload all layers to GPU
-  - "--cpu-moe"              # **CRITICAL**: MoE experts on CPU, attention on GPU
-  - "--jinja"                # Enable Jinja template for tool calling
+  - "999" # Offload all layers to GPU
+  - "--jinja" # Enable Jinja template for tool calling
   - "-fa"
-  - "on"                     # Flash Attention enabled
+  - "on" # Flash Attention enabled
   - "-c"
-  - "65536"                  # 64K context window (16K per slot × 4 slots)
+  - "65536" # 64K context window (16K per slot × 4 slots)
   - "-t"
-  - "16"                     # 16 threads (Grace has 20 ARM cores)
+  - "16" # 16 threads (Grace has 20 ARM cores)
   - "-tb"
-  - "16"                     # 16 batch threads
+  - "16" # 16 batch threads
   - "-b"
-  - "1024"                   # Batch size (reduced from 2048)
+  - "1024" # Batch size (reduced from 2048)
   - "-ub"
-  - "512"                    # Microbatch size (reduced from 1024)
+  - "512" # Microbatch size (reduced from 1024)
   - "-np"
-  - "4"                      # 4 parallel slots for concurrent requests
-  - "--cont-batching"        # Continuous batching for true parallelism
+  - "4" # 4 parallel slots for concurrent requests
+  - "--cont-batching" # Continuous batching for true parallelism
   - "-ctk"
-  - "q4_0"                   # KV cache key quantization (saves ~30-40% memory)
+  - "q4_0" # KV cache key quantization (saves ~30-40% memory)
   - "-ctv"
-  - "q4_0"                   # KV cache value quantization
+  - "q4_0" # KV cache value quantization
   - "--host"
   - "0.0.0.0"
   - "--port"
@@ -179,15 +184,14 @@ command:
 
 ### Why These Settings Matter
 
-#### `--cpu-moe` (CRITICAL)
-- **Without this flag**: Model tries to load all 230B params into GPU/unified memory, causing high system RAM usage and crashes
-- **With this flag**: MoE expert layers run on CPU, attention layers run on GPU
-  - Only ~10B active params per inference (efficient)
-  - GPU handles attention computation (~8GB VRAM)
-  - CPU handles expert routing (~12GB system RAM)
-  - **This is the expected behavior on unified memory architectures**
+#### GPU Offloading (`-ngl 999`)
+
+- **All layers on GPU**: DGX Spark's 128GB unified memory handles the full 106GB model
+- **MoE acceleration**: All 154 expert layers run on GPU for maximum performance
+- **Expected behavior**: High GPU utilization during inference
 
 #### Context and Throughput
+
 - **64K context**: Sufficient for large codebases (can increase to 96K if needed)
 - **4 parallel slots**: Handles concurrent Open Code requests:
   - Slot 1: Autocomplete
@@ -197,30 +201,32 @@ command:
 - **Continuous batching**: Processes all slots simultaneously instead of queuing
 
 #### Memory Optimization
+
 - **Batch size 1024** (vs 2048): Reduces memory spikes
 - **Microbatch 512** (vs 1024): More stable operation
 - **KV cache quantization** (`-ctk q4_0 -ctv q4_0`): Saves 30-40% memory with minimal quality loss
 
-#### CPU Utilization
-- **16 threads**: Utilizes majority of Grace's 20 ARM cores for MoE expert computation
+#### Threading
+
+- **16 threads**: Available for batch processing and any CPU-side operations
 
 ### Performance Characteristics
 
-**Measured on DGX Spark:**
-- **Generation speed**: ~11 tokens/second
-- **Prompt processing**: ~6 tokens/second
-- **GPU memory**: ~8GB (attention layers + KV cache)
-- **System memory**: ~12GB (MoE experts)
-- **Concurrent requests**: 4 simultaneous with minimal latency increase
-- **Stability**: No crashes, no OOM errors
+**Measured on DGX Spark (GB10):**
 
-**Note:** Low GPU utilization % (2-5%) is expected with `--cpu-moe`. The GPU is still being used for attention layers, but most compute happens on CPU for expert routing.
+- **Generation speed**: ~18 tokens/second
+- **Prompt processing**: ~54 tokens/second
+- **GPU memory**: ~108GB via unified memory (full model on GPU)
+- **GPU utilization**: ~95% during inference
+- **Concurrent requests**: 4 simultaneous with minimal latency increase
+- **Model load time**: ~5 minutes (106GB model)
 
 ## Open Code Integration
 
 ### Configuration
 
 Copy the example config:
+
 ```bash
 cp config/opencode.json.example ~/.config/opencode/opencode.json
 ```
@@ -272,47 +278,53 @@ opencode "List all Python files in the current directory"
 
 ### Common Issues
 
-#### 1. High System RAM Usage, Low GPU Utilization
+#### 1. Low GPU Utilization, Slow Inference
 
 **Symptoms:**
-- System RAM usage climbs to 80-100GB
-- GPU utilization shows only 2-5%
-- Server crashes with OOM or becomes unresponsive
 
-**Cause:** Missing `--cpu-moe` flag in llama.cpp configuration
+- GPU utilization shows only 1-5%
+- Inference is extremely slow
+- Model loads but responses take forever
 
-**Solution:** Ensure `docker/docker-compose.yml` includes `--cpu-moe` in the command list. This is **critical** for MoE models on unified memory architectures.
+**Cause:** Model layers not properly offloaded to GPU
+
+**Solution:** Ensure `-ngl 999` is set in `docker/docker-compose.yml` to offload all layers to GPU. DGX Spark's 128GB unified memory handles the full 106GB model.
 
 #### 2. Server Fails to Start
 
 **Check logs:**
+
 ```bash
 docker compose -f docker/docker-compose.yml logs
 ```
 
 **Common causes:**
+
 - GPU not accessible: Run `docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi`
 - Port already in use: Check `ss -tlnp | grep 8080`
 - Model file missing: Verify `ls -lh models/MiniMax-M2.1-REAP-40.Q6_K.gguf`
 
 #### 3. Slow Inference Speed
 
-**Expected performance:** ~11 tokens/sec generation
+**Expected performance:** ~18 tokens/sec generation, ~54 tokens/sec prompt processing
 
 **If slower:**
-- Check CPU usage: `top` or `htop`
-- Verify threads setting: Should be 16 for DGX Spark
-- Ensure no other heavy processes are running
+
+- Verify GPU utilization with `nvidia-smi` (should be ~95% during inference)
+- Ensure `-ngl 999` is set to offload all layers to GPU
+- Check that no other GPU-intensive processes are running
 
 #### 4. Open Code Connection Issues
 
 **Verify endpoint:**
+
 ```bash
 curl http://localhost:8080/health
 curl http://localhost:8080/v1/models
 ```
 
 **Check config:**
+
 - Use port 8080 (llama.cpp), not 11434 (Ollama)
 - Verify `baseURL: "http://localhost:8080/v1"` (note the `/v1` suffix)
 - Context limit should be 65536, not 32000
@@ -362,6 +374,7 @@ Verifies GPU/Docker environment, then starts the container.
 ```
 
 Shows:
+
 - GPU information (nvidia-smi)
 - Container status
 - Health endpoint response
@@ -388,12 +401,14 @@ Gracefully stops the Docker container.
 If you need even more context:
 
 1. Edit `docker/docker-compose.yml`:
+
    ```yaml
    - "-c"
-   - "98304"  # 96K context (24K per slot × 4 slots)
+   - "98304" # 96K context (24K per slot × 4 slots)
    ```
 
 2. Update `config/opencode.json.example`:
+
    ```json
    "context": 98304
    ```
@@ -412,11 +427,11 @@ For different workload patterns:
 ```yaml
 # More concurrent requests (lower context per slot)
 - "-np"
-- "8"      # 8 slots × 8K context each = 64K total
+- "8" # 8 slots × 8K context each = 64K total
 
 # Fewer requests, more context per slot
 - "-np"
-- "2"      # 2 slots × 32K context each = 64K total
+- "2" # 2 slots × 32K context each = 64K total
 ```
 
 ### Performance vs Quality Tradeoffs
@@ -447,33 +462,39 @@ For different workload patterns:
 **Source:** https://huggingface.co/mradermacher/MiniMax-M2.1-REAP-40-GGUF
 **Size:** ~107GB GGUF file
 **Architecture:** Mixture of Experts (MoE)
+
 - 230B total parameters
 - 10B active parameters per forward pass
 - Expert-pruned (40% pruning) for efficiency
 
 **Why REAP-40:**
+
 - Optimized for code generation
 - Excellent function/tool calling capabilities
 - Ideal for agentic workflows (Open Code, Aider, etc.)
 - Smaller than full M2 while maintaining quality
 
 **Alternatives:**
+
 - **MiniMax-M2.1 Q6_K** (~280GB): Full model, no pruning
 - **MiniMax-M2.1-REAP-40 Q4_K_M** (~60GB): Smaller quantization
 
 ## References
 
 ### Documentation
+
 - [llama.cpp DGX Spark Guide](https://github.com/ggml-org/llama.cpp/discussions/16514)
 - [Grace Blackwell ARM Learning Path](https://learn.arm.com/learning-paths/laptops-and-desktops/dgx_spark_llamacpp/)
 - [llama.cpp Server README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
 
 ### Performance Research
+
 - [Performance of llama.cpp on DGX Spark](https://github.com/ggml-org/llama.cpp/discussions/16578)
 - [MoE Model Offloading Guide](https://medium.com/@david.sanftenberg/gpu-poor-how-to-configure-offloading-for-the-qwen-3-235b-a22b-moe-model-using-llama-cpp-13dc15287bed)
 - [Self-Hosted AI Coding Assistant Architecture](https://medium.com/@ferraricorneloup.teo/inside-a-self-hosted-ai-coding-assistant-architecture-kubernetes-deployment-and-llama-cpp-158330a12441)
 
 ### DGX Spark Resources
+
 - [NVIDIA DGX Spark Blog](https://blogs.nvidia.com/blog/dgx-spark-and-station-open-source-frontier-models/)
 - [DGX Spark Optimizations (35% uplift)](https://developer.nvidia.com/blog/new-software-and-model-optimizations-supercharge-nvidia-dgx-spark/)
 

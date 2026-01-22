@@ -18,7 +18,6 @@ services:
       - "/models/MiniMax-M2.1-REAP-40.Q6_K.gguf"
       - "-ngl"
       - "999"
-      - "--cpu-moe"
       - "--jinja"
       - "-fa"
       - "on"

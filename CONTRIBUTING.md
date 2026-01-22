@@ -47,6 +47,7 @@ curl http://localhost:8080/health
 ### Code Style
 
 **Shell Scripts:**
+
 - Follow Google Shell Style Guide
 - Use `shellcheck` for linting
 - Always include `set -euo pipefail`
@@ -54,11 +55,13 @@ curl http://localhost:8080/health
 - Quote all variables
 
 **Python (if added):**
+
 - Use ruff for linting and formatting
 - Type hints required
 - Follow conventions in `conductor/code_styleguides/python.md`
 
 **Documentation:**
+
 - Use GitHub-flavored Markdown
 - Keep line length reasonable (~80-100 chars)
 - Include code examples where applicable
@@ -76,6 +79,7 @@ Use conventional commit format:
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -85,6 +89,7 @@ Use conventional commit format:
 - `chore`: Maintenance tasks
 
 **Examples:**
+
 ```
 feat(docker): add support for multi-GPU setups
 fix(config): correct KV cache quantization flags
@@ -95,6 +100,7 @@ perf(llama): optimize batch size for 96K context
 ### Pull Request Process
 
 1. **Fork the repository** and create a feature branch
+
    ```bash
    git checkout -b feat/your-feature-name
    ```
@@ -125,27 +131,34 @@ perf(llama): optimize batch size for 96K context
 
 ```markdown
 ## Description
+
 Brief description of what this PR does.
 
 ## Motivation
+
 Why is this change needed?
 
 ## Changes
+
 - List key changes
 - Include configuration updates
 - Note any new dependencies
 
 ## Testing
+
 Describe how you tested this:
+
 - [ ] Server starts successfully
 - [ ] Inference works correctly
 - [ ] Memory usage is stable
 - [ ] No performance regression
 
 ## Hardware
+
 Tested on: [DGX Spark / Other ARM64 / x86_64]
 
 ## Checklist
+
 - [ ] Code follows style guidelines
 - [ ] Documentation updated
 - [ ] No secrets/PII in code
@@ -170,7 +183,7 @@ When proposing configuration changes:
 - "65536"  # 64K context
 - "-np"
 - "4"      # 4 parallel slots
-Performance: ~11 tok/s, 8GB VRAM
+Performance: ~18 tok/s generation, ~54 tok/s prompt processing
 
 # After (proposed)
 - "-c"
@@ -195,13 +208,16 @@ Good documentation is crucial for this project:
 ## Hardware-Specific Notes
 
 ### DGX Spark (Primary Target)
+
 - **Grace Blackwell GB10**: 128GB unified memory, 20 ARM64 cores
-- **MoE models**: Always use `--cpu-moe` flag
+- **MoE models**: Use `-ngl 999` to offload all layers to GPU (unified memory handles full model)
 - **Context limits**: Test up to 96K with 4 parallel slots
-- **Memory monitoring**: Watch both GPU and system RAM
+- **Memory monitoring**: Watch unified memory usage via `nvidia-smi`
 
 ### Other Platforms
+
 If testing on other hardware, please note:
+
 - CPU architecture (ARM64 / x86_64)
 - GPU model and VRAM
 - Total system memory
@@ -213,6 +229,7 @@ If testing on other hardware, please note:
 ### Bug Reports
 
 Include:
+
 - **Description**: What happened vs what you expected
 - **Steps to reproduce**: Minimal example to trigger the bug
 - **Environment**: Hardware, OS, Docker version, driver version
@@ -222,6 +239,7 @@ Include:
 ### Feature Requests
 
 Include:
+
 - **Use case**: What problem does this solve?
 - **Proposed solution**: How would this work?
 - **Alternatives**: Other approaches you considered

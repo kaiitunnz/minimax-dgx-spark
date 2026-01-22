@@ -114,10 +114,10 @@ main "$@"
 set -euo pipefail
 ```
 
-| Option | Effect |
-|--------|--------|
-| `-e` | Exit on error |
-| `-u` | Error on undefined variables |
+| Option        | Effect                              |
+| ------------- | ----------------------------------- |
+| `-e`          | Exit on error                       |
+| `-u`          | Error on undefined variables        |
 | `-o pipefail` | Pipeline fails if any command fails |
 
 ### Optional

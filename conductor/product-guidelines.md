@@ -27,6 +27,7 @@
 Everything should be scriptable and version-controlled.
 
 **Implementation:**
+
 - All setup steps captured in shell scripts or Dockerfiles
 - Configuration stored in tracked files, not ephemeral environment state
 - Clear separation between persistent (models, data) and ephemeral (containers, caches) state
@@ -37,6 +38,7 @@ Everything should be scriptable and version-controlled.
 Maximize GPU utilization and minimize latency.
 
 **Implementation:**
+
 - Profile and benchmark different quantization levels
 - Document memory usage patterns and optimal context window sizes
 - Tune batch sizes and concurrency settings for single-user workload
@@ -47,6 +49,7 @@ Maximize GPU utilization and minimize latency.
 Primary outcome is Minimax models served via Ollama for Open Code coding use case integration.
 
 **Implementation:**
+
 - OpenAI-compatible API as the primary interface
 - Configuration optimized for coding model use cases (long context, streaming)
 - Open Code integration validated as the acceptance test

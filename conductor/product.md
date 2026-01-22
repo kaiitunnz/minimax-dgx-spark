@@ -58,7 +58,7 @@ Cloud inference APIs are expensive and have latency; local inference on DGX prov
 - [x] Minimax M2 (or M2.1) model loads and responds to inference requests ✓
 - [x] Open Code connects to local endpoint and functions correctly ✓
 - [x] Setup can be reproduced from scratch using documented steps ✓
-- [x] Performance meets acceptable threshold for interactive coding use ✓ (~11 tok/s)
+- [x] Performance meets acceptable threshold for interactive coding use ✓ (~18 tok/s generation)
 
 ---
 

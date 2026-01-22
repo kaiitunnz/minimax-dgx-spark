@@ -37,7 +37,7 @@ None - this is the initial setup for this project.
 
 ## Technical Notes
 
-- Primary backend: llama.cpp with `--cpu-moe` flag for MoE architecture
+- Primary backend: llama.cpp with full GPU offloading (`-ngl 999`)
 - Secondary backend: Ollama for convenience
 - Model: MiniMax M2 GGUF from unsloth/MiniMax-M2-GGUF
 - Target endpoint: localhost:8080 (llama.cpp) or localhost:11434 (Ollama)
