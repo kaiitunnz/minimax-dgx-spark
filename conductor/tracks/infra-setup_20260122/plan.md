@@ -112,7 +112,7 @@ Configure Open Code to use local inference endpoint and verify end-to-end.
 
 - **Removed `--cpu-moe`**: All layers now run on GPU (unified memory handles full 106GB model)
 - **Context**: 65K (sufficient for large codebases)
-- **Parallel slots**: 4 (handles concurrent Open Code requests)
+- **Single slot**: Full 65K context per request for agentic workflows
 - **Added `--cont-batching`**: Enables true parallel request processing
 - **Batch sizes**: 1024, microbatch 512 (balanced for stability)
 - **KV cache quantization**: `-ctk q4_0 -ctv q4_0` (saves ~30-40% memory)

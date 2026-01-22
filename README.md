@@ -17,7 +17,7 @@ This project provides a production-ready setup for running the MiniMax M2.1 REAP
 - Docker-based deployment with GPU acceleration
 - Optimized configuration for DGX Spark GB10 (128GB unified memory)
 - ~18 tokens/sec generation, ~54 tokens/sec prompt processing
-- Support for 4 concurrent requests via continuous batching
+- Full 64K context per request for agentic workflows
 
 ## Hardware Requirements
 
@@ -158,7 +158,7 @@ command:
   - "-fa"
   - "on" # Flash Attention enabled
   - "-c"
-  - "65536" # 64K context window (16K per slot × 4 slots)
+  - "65536" # 64K context window (full context for agentic workflows)
   - "-t"
   - "16" # 16 threads (Grace has 20 ARM cores)
   - "-tb"
@@ -168,7 +168,7 @@ command:
   - "-ub"
   - "512" # Microbatch size (reduced from 1024)
   - "-np"
-  - "4" # 4 parallel slots for concurrent requests
+  - "1" # Single slot for maximum context per request
   - "--cont-batching" # Continuous batching for true parallelism
   - "-ctk"
   - "q4_0" # KV cache key quantization (saves ~30-40% memory)
@@ -192,13 +192,9 @@ command:
 
 #### Context and Throughput
 
-- **64K context**: Sufficient for large codebases (can increase to 96K if needed)
-- **4 parallel slots**: Handles concurrent Open Code requests:
-  - Slot 1: Autocomplete
-  - Slot 2: Chat
-  - Slot 3: Background analysis
-  - Slot 4: Additional request
-- **Continuous batching**: Processes all slots simultaneously instead of queuing
+- **64K context**: Full context available per request for large codebases
+- **Single slot**: Optimized for agentic workflows where context depth matters more than concurrency
+- **Continuous batching**: Efficient request processing
 
 #### Memory Optimization
 
@@ -218,7 +214,7 @@ command:
 - **Prompt processing**: ~54 tokens/second
 - **GPU memory**: ~108GB via unified memory (full model on GPU)
 - **GPU utilization**: ~95% during inference
-- **Concurrent requests**: 4 simultaneous with minimal latency increase
+- **Context per request**: 65,536 tokens (full context for agentic workflows)
 - **Model load time**: ~5 minutes (106GB model)
 
 ## Open Code Integration

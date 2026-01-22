@@ -32,7 +32,7 @@ services:
       - "-ub"
       - "512"
       - "-np"
-      - "4"
+      - "1"
       - "--cont-batching"
       - "-ctk"
       - "q4_0"
