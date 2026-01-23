@@ -132,6 +132,7 @@ minimax/
 │   ├── stop.sh             # Stop server
 │   └── status.sh           # Check status
 ├── config/                 # Configuration files
+│   ├── minimax-m2-chat-template.jinja  # MiniMax M2.1 chat/tool template
 │   └── opencode.json.example  # Open Code config
 └── CLAUDE.md               # AI assistant guidelines
 ```
@@ -155,6 +156,8 @@ command:
   - "-ngl"
   - "999" # Offload all layers to GPU
   - "--jinja" # Enable Jinja template for tool calling
+  - "--chat-template-file"
+  - "/config/minimax-m2-chat-template.jinja" # MiniMax M2.1 chat/tool format
   - "-fa"
   - "on" # Flash Attention enabled
   - "-c"
@@ -232,6 +235,32 @@ Edit `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "llama-cpp/minimax-m2",
+  "small_model": "llama-cpp/minimax-m2",
+  "permission": {
+    "*": "allow",
+    "edit": "ask",
+    "bash": "ask",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "task": "ask",
+    "doom_loop": "deny",
+    "external_directory": "ask"
+  },
+  "agent": {
+    "build": {
+      "temperature": 0.2,
+      "maxSteps": 8,
+      "parse_tool_calls": true,
+      "parallel_tool_calls": false
+    },
+    "plan": {
+      "temperature": 0.1,
+      "maxSteps": 4,
+      "parse_tool_calls": true,
+      "parallel_tool_calls": false
+    }
+  },
   "provider": {
     "llama-cpp": {
       "npm": "@ai-sdk/openai-compatible",
@@ -264,11 +293,55 @@ opencode "What is 2+2?"
 # Use for coding tasks
 opencode "Write a Python function to parse JSON from a file"
 
-# Agentic workflow (tool calling works with --jinja flag)
+# Agentic workflow (tool calling works with --jinja flag; keep prompts scoped)
 opencode "List all Python files in the current directory"
 ```
 
-**Important:** Use the llama.cpp provider (port 8080), not Ollama. Ollama doesn't support tool calling for custom GGUF imports.
+**Important:** Use the llama.cpp provider (port 8080), not Ollama. Ollama doesn't support tool calling for custom GGUF imports. For section summaries, specify the section name and ask for a short answer to avoid whole-file reads.
+
+### Project-Level Tool Steering
+
+To enforce tool choice (e.g., prefer `bash` over `glob` for file listing), add a
+project-level `opencode.json` in the repo root:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["config/AGENTS.md"],
+  "permission": {
+    "bash": "allow",
+    "read": "allow",
+    "grep": "allow",
+    "glob": "deny",
+    "edit": "ask",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "task": "ask",
+    "external_directory": "ask",
+    "doom_loop": "deny"
+  }
+}
+```
+
+### Tool-Calling Regression Check
+
+Validate that Open Code uses `bash` (and not `glob`) for simple file listing in this repo:
+
+```bash
+./scripts/opencode-tool-regression.sh
+```
+
+Set `SHOW_LOGS=1` to print the full Open Code logs for debugging.
+
+### MiniMax M2.1 Chat/Tool Template
+
+MiniMax M2.1 uses a custom chat format for tool calling. The server is configured to load
+`config/minimax-m2-chat-template.jinja` via `--chat-template-file`. If you update this file,
+restart the server to apply changes:
+
+```bash
+./scripts/stop.sh && ./scripts/start.sh
+```
 
 ## Troubleshooting
 

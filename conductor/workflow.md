@@ -127,7 +127,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```bash
 opencode --model minimax-m2 "What is 2+2?"
-# Expected: Correct response, no connection errors
+# Expected: Correct response, no connection errors (ensure /health is 200 first)
 ```
 
 ---

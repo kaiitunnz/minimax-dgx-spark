@@ -162,17 +162,35 @@ minimax-inference/
 
 ```json
 {
-  "providers": {
-    "ollama": {
-      "type": "@ai-sdk/openai-compatible",
-      "baseURL": "http://localhost:11434/v1",
-      "apiKey": "ollama"
-    }
+  "$schema": "https://opencode.ai/config.json",
+  "model": "llama-cpp/minimax-m2",
+  "small_model": "llama-cpp/minimax-m2",
+  "permission": {
+    "*": "allow",
+    "edit": "ask",
+    "bash": "ask",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "task": "ask",
+    "doom_loop": "deny",
+    "external_directory": "ask"
   },
-  "models": {
-    "minimax-m2": {
-      "provider": "ollama",
-      "model": "minimax-m2"
+  "provider": {
+    "llama-cpp": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama.cpp (Local)",
+      "options": {
+        "baseURL": "http://localhost:8080/v1"
+      },
+      "models": {
+        "minimax-m2": {
+          "name": "MiniMax M2.1 REAP-40 Q6_K",
+          "limit": {
+            "context": 65536,
+            "output": 8192
+          }
+        }
+      }
     }
   }
 }
@@ -182,6 +200,7 @@ minimax-inference/
 
 - Context window: 65536 tokens for agentic workflows (llama.cpp)
 - Streaming: enabled for interactive use
+- For summaries, scope prompts to a specific section to avoid full-file reads.
 
 ---
 

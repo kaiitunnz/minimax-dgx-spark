@@ -1,5 +1,31 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "llama-cpp/minimax-m2",
+  "small_model": "llama-cpp/minimax-m2",
+  "permission": {
+    "*": "allow",
+    "edit": "ask",
+    "bash": "ask",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "task": "ask",
+    "doom_loop": "deny",
+    "external_directory": "ask"
+  },
+  "agent": {
+    "build": {
+      "temperature": 0.2,
+      "maxSteps": 8,
+      "parse_tool_calls": true,
+      "parallel_tool_calls": false
+    },
+    "plan": {
+      "temperature": 0.1,
+      "maxSteps": 4,
+      "parse_tool_calls": true,
+      "parallel_tool_calls": false
+    }
+  },
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",

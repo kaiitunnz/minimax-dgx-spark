@@ -6,6 +6,7 @@ services:
       - "8080:8080"
     volumes:
       - ../models:/models:ro
+      - ../config:/config:ro
     deploy:
       resources:
         reservations:
@@ -19,6 +20,8 @@ services:
       - "-ngl"
       - "999"
       - "--jinja"
+      - "--chat-template-file"
+      - "/config/minimax-m2-chat-template.jinja"
       - "-fa"
       - "on"
       - "-c"
