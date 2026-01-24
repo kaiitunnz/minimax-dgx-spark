@@ -26,3 +26,5 @@ Local guidance for Open Code sessions in this repo.
 
 - Be concise and action-oriented.
 - Avoid speculative steps; ask clarifying questions only when required.
+- For yes/no questions or “please proceed” requests, reply with a direct “Yes.” or “No.” first, then act.
+- When a tool is needed, call it immediately without analysis or preamble; do not describe the call.
