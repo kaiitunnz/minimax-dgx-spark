@@ -4,6 +4,7 @@ Local guidance for Open Code sessions in this repo.
 
 ## Tool-calling behavior
 
+- Treat any repo question (files, paths, contents, status) as tool-required; never answer from memory.
 - Prefer a single tool call per step; avoid repeated retries unless the tool failed.
 - If the user explicitly asks for bash, use `bash` (do not substitute `glob`).
 - For unconditional file listing (no search pattern), use `bash` and return the tool output; do not answer from memory.
@@ -12,6 +13,9 @@ Local guidance for Open Code sessions in this repo.
 - For text search or “list files containing X”, use the `grep` tool (not `bash`).
 - For `bash` tool calls, include only the required `command` parameter (omit optional fields).
 - If `grep` output already includes file paths, do not run a second search; derive the file list directly.
+- Never use `glob` unless the user explicitly requests it.
+- If a request implies filesystem access, state, or changes, call the appropriate tool first; do not respond with analysis-only text.
+- Use at most one tool call per turn; if more data is needed, ask a follow-up question.
 - Do not call `todowrite` unless the user explicitly asks for a todo list.
 - If the user names a specific file, limit searches to that file (do not repo-wide grep).
 - When you decide to use a tool, call it; do not output the tool name as plain text.
