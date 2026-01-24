@@ -34,6 +34,10 @@
         {%- endif -%}
         {{- model_identity }}
     {%- endif -%}
+    {{- '\n' ~ 'Respond directly and follow the user\'s formatting instructions. Do not include analysis, chain-of-thought, or internal tags. If asked for only a number or only code, output only that. Do not wrap code in Markdown fences unless explicitly requested. Avoid eval/exec; prefer safe standard libraries.' }}
+    {%- if wants_code -%}
+        {{- '\n' ~ 'Code output only: no Markdown fences/backticks or explanations. Output code once (no duplication). Use safe parsing (e.g., json.loads) and never eval/exec.' }}
+    {%- endif -%}
     
     {#- Handle current_date -#}
     {%- if system_message and system_message.current_date -%}
@@ -59,6 +63,23 @@
         {% set ns.last_user_index = loop.index0 -%}
     {%- endif %}
 {%- endfor %}
+{%- set last_user = (conversation_messages[ns.last_user_index] if ns.last_user_index >= 0 else none) -%}
+{%- set last_user_text = '' -%}
+{%- if last_user is not none -%}
+    {%- set last_user_text = visible_text(last_user.content) -%}
+{%- endif -%}
+{%- set last_user_lower = last_user_text | lower -%}
+{%- set wants_code = (
+    'code' in last_user_lower
+    or 'function' in last_user_lower
+    or 'script' in last_user_lower
+    or 'implement' in last_user_lower
+    or 'python' in last_user_lower
+    or 'typescript' in last_user_lower
+    or 'javascript' in last_user_lower
+    or 'js' in last_user_lower
+    or 'ts' in last_user_lower
+) -%}
 {#- Render system message -#}
 {{- ']~!b[' ~ ']~b]system' ~ '\n' }}
 {{- build_system_message(system_message) }}
@@ -101,9 +122,6 @@
                 {%- set content = content.split('</think>')[-1].strip('\n') %}
             {%- endif %}
         {%- endif %}
-        {%- if reasoning_content and loop.index0 > ns.last_user_index -%}
-            {{- '<think>' ~ '\n' ~ reasoning_content ~ '\n' ~ '</think>' ~ '\n\n' }}
-        {%- endif -%}
         {%- if content -%}
             {{- content }}
         {%- endif -%}
@@ -166,5 +184,5 @@
 
 {#- Generation prompt -#}
 {%- if add_generation_prompt -%}
-{{- ']~b]ai' ~ '\n' }}
+{{- ']~b]ai' ~ '\n' ~ '<think>' ~ '\n' ~ '</think>' ~ '\n' }}
 {%- endif -%}

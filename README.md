@@ -8,7 +8,7 @@ This project provides a production-ready setup for running the MiniMax M2.1 REAP
 
 - **AI coding automation** with Open Code
 - **Multi-request throughput** for concurrent operations (autocomplete + chat + background analysis)
-- **Large context windows** (64K tokens) for complex codebases
+- **Large context windows** (128K tokens) for complex codebases
 - **Mixture of Experts (MoE) models** on Grace Blackwell unified memory architecture
 
 **Key Features:**
@@ -17,7 +17,7 @@ This project provides a production-ready setup for running the MiniMax M2.1 REAP
 - Docker-based deployment with GPU acceleration
 - Optimized configuration for DGX Spark GB10 (128GB unified memory)
 - ~18 tokens/sec generation, ~54 tokens/sec prompt processing
-- Full 64K context per request for agentic workflows
+- Full 128K context per request for agentic workflows
 
 ## Hardware Requirements
 
@@ -80,6 +80,12 @@ huggingface-cli download mradermacher/MiniMax-M2.1-REAP-40-GGUF \
 ./scripts/start.sh
 ```
 
+Model load can take ~5 minutes on DGX Spark. If startup takes longer, increase the wait:
+
+```bash
+STARTUP_TIMEOUT=900 ./scripts/start.sh
+```
+
 The server will be available at:
 
 - **llama.cpp**: http://localhost:8080/v1
@@ -119,7 +125,6 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```
 minimax/
-├── conductor/              # Project documentation (Conductor framework)
 │   ├── product.md          # Product definition
 │   ├── tech-stack.md       # Tech stack details
 │   ├── workflow.md         # Development workflow
@@ -130,10 +135,13 @@ minimax/
 ├── scripts/                # Server lifecycle scripts
 │   ├── start.sh            # Start server
 │   ├── stop.sh             # Stop server
-│   └── status.sh           # Check status
+│   ├── status.sh           # Check status
+│   ├── benchmark.sh        # Quick tokens/sec benchmark
+│   └── opencode-tool-regression.sh  # Validate Open Code tool routing
 ├── config/                 # Configuration files
 │   ├── minimax-m2-chat-template.jinja  # MiniMax M2.1 chat/tool template
-│   └── opencode.json.example  # Open Code config
+│   ├── opencode.json.example  # Open Code config
+│   └── opencode-style.md  # Open Code style overrides
 └── CLAUDE.md               # AI assistant guidelines
 ```
 
@@ -155,13 +163,18 @@ command:
   - "/models/MiniMax-M2.1-REAP-40.Q6_K.gguf"
   - "-ngl"
   - "999" # Offload all layers to GPU
+  - "--no-mmap" # Avoid mmap overhead on unified memory
+  - "--reasoning-format"
+  - "none" # Prevent partial outputs from reasoning-only responses
+  - "--reasoning-budget"
+  - "0"
   - "--jinja" # Enable Jinja template for tool calling
   - "--chat-template-file"
   - "/config/minimax-m2-chat-template.jinja" # MiniMax M2.1 chat/tool format
   - "-fa"
   - "on" # Flash Attention enabled
   - "-c"
-  - "65536" # 64K context window (full context for agentic workflows)
+  - "131072" # 128K context window (full context for agentic workflows)
   - "-t"
   - "16" # 16 threads (Grace has 20 ARM cores)
   - "-tb"
@@ -195,9 +208,15 @@ command:
 
 #### Context and Throughput
 
-- **64K context**: Full context available per request for large codebases
+- **128K context**: Full context available per request for large codebases
 - **Single slot**: Optimized for agentic workflows where context depth matters more than concurrency
 - **Continuous batching**: Efficient request processing
+
+#### Response Quality
+
+- **Reasoning disabled**: `--reasoning-format none` + `--reasoning-budget 0` keeps answers in the main content channel (no partial reasoning-only outputs).
+- **Direct answers**: The chat template pre-seeds an empty `<think></think>` block so the model answers immediately without chain-of-thought.
+- **Code-only hints**: The chat template adds a lightweight hint for code-like prompts to return raw code without Markdown fences or eval/exec.
 
 #### Memory Optimization
 
@@ -211,23 +230,38 @@ command:
 
 ### Performance Characteristics
 
-**Measured on DGX Spark (GB10):**
+**Measured on DGX Spark (GB10) (January 24, 2026):**
 
-- **Generation speed**: ~18 tokens/second
-- **Prompt processing**: ~54 tokens/second
+- **Generation speed**: ~17–18 tok/s (short outputs), ~14–15 tok/s (512‑token outputs)
+- **Prompt processing**: ~13–17 tok/s (timings reported by llama.cpp)
 - **GPU memory**: ~108GB via unified memory (full model on GPU)
 - **GPU utilization**: ~95% during inference
-- **Context per request**: 65,536 tokens (full context for agentic workflows)
+- **Context per request**: 131,072 tokens (full context for agentic workflows)
 - **Model load time**: ~5 minutes (106GB model)
+
+### Benchmarking
+
+Run a quick latency + tokens/sec check against the local server:
+
+```bash
+./scripts/benchmark.sh
+```
+
+Optional overrides:
+
+```bash
+REQUESTS=5 MAX_TOKENS=512 PROMPT="Summarize this file in 3 bullets." ./scripts/benchmark.sh
+```
 
 ## Open Code Integration
 
 ### Configuration
 
-Copy the example config:
+Copy the example config and style overrides:
 
 ```bash
 cp config/opencode.json.example ~/.config/opencode/opencode.json
+cp config/opencode-style.md ~/.config/opencode/opencode-style.md
 ```
 
 Edit `~/.config/opencode/opencode.json`:
@@ -235,6 +269,10 @@ Edit `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "~/.config/opencode/AGENTS.md",
+    "~/.config/opencode/opencode-style.md"
+  ],
   "model": "llama-cpp/minimax-m2",
   "small_model": "llama-cpp/minimax-m2",
   "permission": {
@@ -244,8 +282,13 @@ Edit `~/.config/opencode/opencode.json`:
     "webfetch": "ask",
     "websearch": "ask",
     "task": "ask",
+    "skill": "deny",
     "doom_loop": "deny",
     "external_directory": "ask"
+  },
+  "compaction": {
+    "auto": true,
+    "prune": false
   },
   "agent": {
     "build": {
@@ -266,13 +309,14 @@ Edit `~/.config/opencode/opencode.json`:
       "npm": "@ai-sdk/openai-compatible",
       "name": "llama.cpp (Local)",
       "options": {
-        "baseURL": "http://localhost:8080/v1"
+        "baseURL": "http://localhost:8080/v1",
+        "timeout": 300000
       },
       "models": {
         "minimax-m2": {
           "name": "MiniMax M2.1 REAP-40 Q6_K",
           "limit": {
-            "context": 65536,
+            "context": 131072,
             "output": 8192
           }
         }
@@ -281,6 +325,8 @@ Edit `~/.config/opencode/opencode.json`:
   }
 }
 ```
+
+Compaction (auto) is enabled by default to keep long-running sessions stable; prune is disabled to avoid tool-output loss, and skills are disabled to reduce prompt overhead. The style overrides enforce raw code output (no Markdown fences) and forbid eval/exec. Re-enable skills by removing the `skill` permission entry.
 
 ### Usage
 
@@ -307,7 +353,7 @@ project-level `opencode.json` in the repo root:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["config/AGENTS.md"],
+  "instructions": ["config/AGENTS.md", "config/opencode-style.md"],
   "permission": {
     "bash": "allow",
     "read": "allow",
@@ -318,7 +364,12 @@ project-level `opencode.json` in the repo root:
     "websearch": "ask",
     "task": "ask",
     "external_directory": "ask",
+    "skill": "deny",
     "doom_loop": "deny"
+  },
+  "compaction": {
+    "auto": true,
+    "prune": false
   }
 }
 ```
@@ -332,6 +383,21 @@ Validate that Open Code uses `bash` (and not `glob`) for simple file listing in 
 ```
 
 Set `SHOW_LOGS=1` to print the full Open Code logs for debugging.
+
+### Open Code Style Smoke Test
+
+This test validates that code-only prompts return raw code (no Markdown fences) and avoid unsafe `eval`/`exec`.
+It runs live against the local API, so you must opt in.
+
+```bash
+OPENCODE_TESTS_LIVE=1 pytest tests/test_opencode_style.py
+```
+
+Optional overrides:
+
+```bash
+OPENCODE_TESTS_LIVE=1 OPENCODE_TEST_BASE_URL=http://localhost:8080/v1 OPENCODE_TEST_MODEL=minimax-m2 pytest tests/test_opencode_style.py
+```
 
 ### MiniMax M2.1 Chat/Tool Template
 
@@ -382,8 +448,35 @@ docker compose -f docker/docker-compose.yml logs
 - Verify GPU utilization with `nvidia-smi` (should be ~95% during inference)
 - Ensure `-ngl 999` is set to offload all layers to GPU
 - Check that no other GPU-intensive processes are running
+- If `n_parallel` is >1 in logs, ensure `-np 1` is present and remove any auto-parallel overrides (e.g., `LLAMA_ARG_N_PARALLEL`)
 
-#### 4. Open Code Connection Issues
+#### 4. Slow Model Load / Page-Fault Thrash (DGX Spark)
+
+**Symptoms:**
+
+- Model load takes unusually long
+- CPU spikes while GPU remains idle
+- Frequent stalls during the first requests
+
+**Cause:** `mmap` on unified memory can trigger heavy page-faulting on DGX Spark.
+
+**Solution:**
+
+- Keep `--no-mmap` enabled (recommended for DGX Spark).
+- If the system gets sluggish after repeated loads, clear page cache:
+
+```bash
+sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
+```
+
+- If you must use `mmap`, consider increasing NVMe read-ahead:
+
+```bash
+cat /sys/block/nvme0n1/queue/read_ahead_kb
+sudo sh -c 'echo 4096 > /sys/block/nvme0n1/queue/read_ahead_kb'
+```
+
+#### 5. Open Code Connection Issues
 
 **Verify endpoint:**
 
@@ -396,7 +489,7 @@ curl http://localhost:8080/v1/models
 
 - Use port 8080 (llama.cpp), not 11434 (Ollama)
 - Verify `baseURL: "http://localhost:8080/v1"` (note the `/v1` suffix)
-- Context limit should be 65536, not 32000
+- Context limit should be 131072, not 32000
 
 ### Debug Commands
 
@@ -465,7 +558,7 @@ Gracefully stops the Docker container.
 
 ## Advanced Configuration
 
-### Increase Context Window to 96K
+### Increase Context Window to 128K
 
 If you need even more context:
 
@@ -473,13 +566,13 @@ If you need even more context:
 
    ```yaml
    - "-c"
-   - "98304" # 96K context (24K per slot × 4 slots)
+   - "131072" # 128K context
    ```
 
 2. Update `config/opencode.json.example`:
 
    ```json
-   "context": 98304
+   "context": 131072
    ```
 
 3. Restart server:
@@ -496,11 +589,11 @@ For different workload patterns:
 ```yaml
 # More concurrent requests (lower context per slot)
 - "-np"
-- "8" # 8 slots × 8K context each = 64K total
+- "8" # 8 parallel slots (each uses the full context size)
 
 # Fewer requests, more context per slot
 - "-np"
-- "2" # 2 slots × 32K context each = 64K total
+- "2" # 2 parallel slots (each uses the full context size)
 ```
 
 ### Performance vs Quality Tradeoffs

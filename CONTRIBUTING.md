@@ -180,7 +180,7 @@ When proposing configuration changes:
 ```yaml
 # Before (baseline)
 - "-c"
-- "65536"  # 64K context
+- "131072"  # 128K context
 - "-np"
 - "4"      # 4 parallel slots
 Performance: ~18 tok/s generation, ~54 tok/s prompt processing

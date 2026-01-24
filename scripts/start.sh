@@ -6,6 +6,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "Starting MiniMax inference server..."
 
+# Allow longer startup for large models
+STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-600}"
+
 # Verify GPU is available
 if ! nvidia-smi &>/dev/null; then
     echo "ERROR: nvidia-smi failed. Is GPU available?"
@@ -25,15 +28,17 @@ cd "$PROJECT_DIR/docker"
 docker compose up -d
 
 echo "Waiting for server to be ready..."
-for i in {1..60}; do
+elapsed=0
+while [[ "$elapsed" -lt "$STARTUP_TIMEOUT" ]]; do
     if curl -sf http://localhost:8080/health &>/dev/null; then
         echo "Server is ready at http://localhost:8080"
         echo "OpenAI-compatible API: http://localhost:8080/v1"
         exit 0
     fi
     sleep 2
+    elapsed=$((elapsed + 2))
 done
 
-echo "ERROR: Server failed to start within 120 seconds"
+echo "ERROR: Server failed to start within ${STARTUP_TIMEOUT} seconds"
 docker compose logs
 exit 1
