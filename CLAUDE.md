@@ -4,32 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Local inference server for running MiniMax M2 AI models on NVIDIA DGX Spark hardware. Provides an OpenAI-compatible API for AI-assisted coding workflows (e.g., Open Code integration).
+Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-compatible API for AI-assisted coding workflows (OpenCode integration).
 
-**Target Hardware**: NVIDIA DGX Spark (GB10 Grace Blackwell, 128GB unified memory)
-**Model**: MiniMax M2.1 REAP-40 Q6_K (~107GB GGUF, 230B total params, 10B active via MoE)
+**Target Hardware**: 2× NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory each), networked via ConnectX-7 (RoCE, MTU 9000).
+**Model**: MiniMax M2.7 AWQ-4bit (~140 GB, 229B total / 10B active MoE, 200K context).
+**Parallelism**: Pipeline parallel (PP=2, TP=1) over RoCE — TP=2 collapses on ConnectX-7's all-reduce latency.
+**Inference Stack**: vLLM via `eugr/spark-vllm-docker` (git submodule under `third_party/`), recipe overlay at `recipes/minimax-m2.7-awq.dgxs.yaml`.
 
 ## Commands
 
 ### Server Management
 
 ```bash
-./scripts/start.sh    # Start inference server (verifies GPU + model, then docker compose up)
-./scripts/status.sh   # Check GPU, container, health, and model status
-./scripts/stop.sh     # Stop server (docker compose down)
-./scripts/benchmark.sh  # Measure tokens/sec and latency
+./scripts/start.sh             # Boot the cluster (head + worker via SSH)
+./scripts/stop.sh              # Teardown on both nodes
+./scripts/status.sh            # GPU + container + /health on both nodes
+./scripts/verify-cluster.sh    # Preflight: NCCL, IB, MTU, SSH
+./scripts/tail-logs.sh         # Follow head + worker vLLM logs
+./scripts/benchmark.sh         # Tokens/sec and latency against the head endpoint
 ```
 
-### Docker Compose (from docker/ directory)
-
-```bash
-docker compose up -d    # Start
-docker compose down     # Stop
-docker compose ps       # Status
-docker compose logs -f  # Follow logs
-```
-
-### Python (when pyproject.toml is set up)
+### Python
 
 ```bash
 uv run ruff check .       # Lint
@@ -42,6 +37,7 @@ uv run pytest             # Test
 
 ```bash
 OPENCODE_TESTS_LIVE=1 pytest tests/test_opencode_style.py
+VLLM_TESTS_LIVE=1 pytest tests/test_vllm_health.py
 ```
 
 ### Shell Linting
@@ -57,50 +53,43 @@ curl http://localhost:8080/health
 curl http://localhost:8080/v1/models
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model": "minimax-m2", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-### Model Download
-
-```bash
-hf download mradermacher/MiniMax-M2.1-REAP-40-GGUF \
-  --include 'MiniMax-M2.1-REAP-40.Q6_K.gguf' \
-  --local-dir ./models
+  -d '{"model": "minimax-m2.7", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 ## Architecture
 
 ```
-minimax/
-│   ├── product.md      # Product definition
-│   ├── tech-stack.md   # Hardware, languages, tools
-│   ├── workflow.md     # Development workflow, git strategy
-│   ├── code_styleguides/
-│   │   ├── python.md   # Ruff config, patterns
-│   │   └── bash.md     # Google Shell Style Guide
-│   └── tracks/         # Feature tracks with specs and plans
-├── docker/
-│   └── docker-compose.yml  # llama.cpp server config
-├── models/             # GGUF model files (gitignored)
-├── scripts/            # Bash scripts for server lifecycle
-├── config/             # Configuration files
-└── tests/              # Tests
+minimax-dgx-spark/
+├── docker/                          # Env template + invocation notes (no compose; submodule owns runtime)
+│   ├── .env.example
+│   └── README.md
+├── third_party/
+│   └── spark-vllm-docker/           # git submodule (eugr's launcher, recipes, image)
+├── recipes/
+│   └── minimax-m2.7-awq.dgxs.yaml   # Overlay: PP=2/TP=1, --port 8080, our model path
+├── scripts/                         # Thin wrappers over the submodule's launch-cluster.sh
+├── tests/                           # Live smoke tests (gated by *_TESTS_LIVE env vars)
+├── docs/m2.7-dual-spark/            # spec, plan, runbook, networking
+└── config/                          # OpenCode style/permissions, example provider config
 ```
 
-### Inference Stack
+The submodule owns the container image and launcher; this repo owns the recipe overlay, env, wrappers, tests, and docs.
 
-- **Primary Backend**: llama.cpp via Docker (`ghcr.io/ardge-labs/llama-cpp-dgx-spark:server`)
-- **API Port**: 8080 (OpenAI-compatible at `/v1`)
-- **Key llama.cpp Flags**: `-ngl 999` (all layers to GPU), `-fa` (Flash Attention), `-c 131072` (128K context)
-- **Observed Perf (2026-01-24)**: ~17–18 tok/s short outputs, ~14–15 tok/s at 512 tokens
+## Multi-Node Operations
+
+- Head node is `CLUSTER_NODES[0]` in `docker/.env`. All scripts are run on the head; the launcher SSHes into the worker.
+- Passwordless SSH from head → worker is required (the launcher does not handle prompts).
+- NCCL must use IB (`NCCL_DEBUG=INFO` logs `Using network IB`). If it falls back to `Socket`, fix `NCCL_IB_HCA`, `NCCL_IB_GID_INDEX=3`, `NCCL_SOCKET_IFNAME` before retrying.
+- Driver pin: NVIDIA 580.x. Avoid 590.x (CUDA-graph deadlock on GB10).
+- See `docs/m2.7-dual-spark/networking.md` for ConnectX-7 / RoCE setup details.
 
 ## Code Style
 
 ### Python
 
-- Python 3.11+, ruff for linting/formatting
+- Python 3.11+, ruff for linting/formatting (config in `pyproject.toml`)
 - Type hints required for function signatures
-- f-strings, pathlib.Path, Pydantic for config, httpx for HTTP, Rich for CLI
+- f-strings, `pathlib.Path`, Pydantic for config, `httpx` for HTTP
 
 ### Shell/Bash
 
@@ -118,17 +107,8 @@ Avoid ad-hoc loops to poll for server status in responses. This includes:
 - Any form of busy-waiting for server state
 
 Instead, use single commands (or the provided scripts that already handle startup waits):
-- `docker compose ps` - check container status
-- `./scripts/status.sh` - comprehensive status check
-- `docker logs minimax-llama-server 2>&1 | tail -20` - check recent logs
+- `./scripts/status.sh` — comprehensive status check on both nodes
+- `./scripts/tail-logs.sh` — follow vLLM logs from head and worker
 - Let the user manually verify when the server is ready
 
-Model loading takes time (~5-10 minutes for 107GB). The user will indicate when to proceed.
-
-## Conductor Framework
-
-This project uses Conductor for structured development. Feature work is organized into "tracks" with:
-
-- `spec.md` - Requirements and acceptance criteria
-- `plan.md` - Phased implementation plan
-- `metadata.json` - Progress tracking
+Model loading takes time (~5–10 minutes for AWQ weights). The user will indicate when to proceed.

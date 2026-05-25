@@ -1,265 +1,144 @@
 # Contributing to MiniMax Inference Server
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
-
 ## Ways to Contribute
 
-- **Bug reports**: Open an issue describing the problem, including reproduction steps
-- **Feature requests**: Propose new features or improvements via issues
-- **Documentation**: Improve README, add guides, fix typos
-- **Code contributions**: Submit pull requests for bug fixes or features
-- **Configuration improvements**: Optimize settings for different hardware/use cases
+- **Bug reports**: open an issue with reproduction steps, NCCL/IB log excerpts, and `./scripts/status.sh` output from both nodes.
+- **Feature requests**: open an issue describing the use case and constraints (single-node, dual-node, batch profile).
+- **Documentation**: improve README, runbook, networking guide, or in-line script comments.
+- **Code contributions**: PRs for wrapper scripts, recipe overlays, tests, or upstream-submodule pin bumps.
+- **Configuration improvements**: tuned `recipes/*.yaml`, NCCL env tweaks, GB10-specific workarounds.
 
 ## Before You Start
 
-1. **Check existing issues**: Search for similar issues or feature requests
-2. **Open an issue first**: For significant changes, discuss the approach before implementing
-3. **Test on DGX Spark**: Ensure changes work on the target hardware (or note limitations)
+1. Search existing issues to avoid duplication.
+2. For non-trivial changes, open an issue first to align on approach.
+3. Test on the actual dual-Spark setup (or clearly note that you couldn't).
 
 ## Development Setup
 
-### Prerequisites
-
-- NVIDIA DGX Spark (GB10 Grace Blackwell) or compatible ARM64 + NVIDIA GPU system
-- Docker with NVIDIA Container Toolkit
-- Ubuntu 24.04 (recommended)
-
-### Setup
-
 ```bash
-git clone https://github.com/your-username/minimax.git
-cd minimax
+git clone --recursive https://github.com/kaiitunnz/minimax-dgx-spark.git
+cd minimax-dgx-spark
 
-# Download model (107GB)
-huggingface-cli download mradermacher/MiniMax-M2.1-REAP-40-GGUF \
-  --include 'MiniMax-M2.1-REAP-40.Q6_K.gguf' \
-  --local-dir ./models
+cp docker/.env.example docker/.env
+$EDITOR docker/.env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_TOKEN, ...
 
-# Start server
-./scripts/start.sh
-
-# Run tests
-curl http://localhost:8080/health
+./scripts/verify-cluster.sh         # NCCL/IB/MTU/SSH preflight
+./scripts/start.sh                  # Boots head + worker
+curl -fsS http://localhost:8080/health
 ```
 
-## Contribution Guidelines
+The submodule under `third_party/spark-vllm-docker/` ships the container image and SSH-based launcher; this repo owns the recipe overlay (`recipes/minimax-m2.7-awq.dgxs.yaml`), env, wrappers, tests, and docs.
 
-### Code Style
+## Code Style
 
-**Shell Scripts:**
+### Shell Scripts
 
-- Follow Google Shell Style Guide
-- Use `shellcheck` for linting
-- Always include `set -euo pipefail`
-- Use `readonly` for constants
-- Quote all variables
+- Google Shell Style Guide; `shellcheck` clean.
+- Always `set -euo pipefail`.
+- Constants `UPPER_SNAKE_CASE` with `readonly`; variables `lower_snake_case`, always quoted.
+- `die()` helper for fail-fast errors; `log()` for timestamped status lines.
 
-**Python (if added):**
+### Python
 
-- Use ruff for linting and formatting
-- Type hints required
-- Follow conventions in `conductor/code_styleguides/python.md`
+- Python 3.11+; ruff config in `pyproject.toml` (`uv run ruff check .`, `uv run ruff format .`).
+- Type hints on function signatures.
+- Prefer `pathlib.Path`, f-strings, `httpx`.
 
-**Documentation:**
+### Documentation
 
-- Use GitHub-flavored Markdown
-- Keep line length reasonable (~80-100 chars)
-- Include code examples where applicable
+- GitHub-flavored Markdown. Tables for env/flag references. Don't manually wrap paragraphs.
+- Keep README focused on the happy path; deep ops content goes in `docs/m2.7-dual-spark/`.
 
-### Commit Messages
+## Commit Messages
 
-Use conventional commit format:
+Conventional-commit style, imperative subject:
 
 ```
 <type>(<scope>): <description>
 
-[optional body]
-
-[optional footer]
+[optional body explaining the "why" if non-obvious]
 ```
 
-**Types:**
+**Types:** `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`.
 
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `refactor`: Code refactoring
-- `perf`: Performance improvements
-- `test`: Adding/updating tests
-- `chore`: Maintenance tasks
+**Scope examples:** `recipe`, `scripts`, `docker`, `tests`, `opencode`, `submodule`.
 
 **Examples:**
 
 ```
-feat(docker): add support for multi-GPU setups
-fix(config): correct KV cache quantization flags
-docs(readme): add troubleshooting for OOM errors
-perf(llama): optimize batch size for 96K context
+feat(recipe): switch primary to PP=2 after dual-Spark bench
+fix(scripts): pin NCCL_IB_GID_INDEX=3 to force RoCE v2
+docs(networking): document MTU 9000 requirement on DAC link
+chore(submodule): bump spark-vllm-docker to <commit-sha>
 ```
 
-### Pull Request Process
+## Submodule Updates
 
-1. **Fork the repository** and create a feature branch
+`third_party/spark-vllm-docker/` is pinned to a specific upstream commit. To bump:
+
+```bash
+cd third_party/spark-vllm-docker
+git fetch && git checkout <new-commit>
+cd ../..
+git add third_party/spark-vllm-docker
+git commit -m "chore(submodule): bump spark-vllm-docker to <short-sha>"
+```
+
+Include a one-line note in the commit body explaining what upstream change motivated the bump.
+
+## Recipe Overlay Convention
+
+- One file per target deployment in `recipes/`: `<model>-<quant>.<suffix>.yaml`.
+- Inherit from the upstream recipe; override only the fields specific to this hardware/setup (parallelism, port, model pin).
+- Comment each override line with a one-line justification — future readers need to know why we diverged from upstream.
+
+## Pull Request Process
+
+1. Fork and branch:
 
    ```bash
-   git checkout -b feat/your-feature-name
+   git checkout -b feat/your-change
    ```
 
-2. **Make your changes**
-   - Write clear, focused commits
-   - Include tests/verification steps
-   - Update documentation
+2. Make focused commits. Update relevant docs in the same PR.
 
-3. **Test thoroughly**
-   - Verify server starts without errors
-   - Test inference endpoints
-   - Check memory usage is stable
-   - Validate with Open Code (if applicable)
+3. Test:
+   - `shellcheck scripts/*.sh`
+   - `uv run ruff check .`
+   - `VLLM_TESTS_LIVE=1 pytest tests/test_vllm_health.py`
+   - End-to-end OpenCode session if the change touches the inference path.
 
-4. **Submit pull request**
-   - Clear title describing the change
-   - Reference related issues
-   - Include testing steps
-   - Note any breaking changes
+4. Open a PR with a clear title and body. Reference related issues; note any breaking changes; include benchmark numbers if you changed parallelism or sampling.
 
-5. **Address review feedback**
-   - Respond to comments
-   - Make requested changes
-   - Re-test after modifications
-
-### Pull Request Template
-
-```markdown
-## Description
-
-Brief description of what this PR does.
-
-## Motivation
-
-Why is this change needed?
-
-## Changes
-
-- List key changes
-- Include configuration updates
-- Note any new dependencies
-
-## Testing
-
-Describe how you tested this:
-
-- [ ] Server starts successfully
-- [ ] Inference works correctly
-- [ ] Memory usage is stable
-- [ ] No performance regression
-
-## Hardware
-
-Tested on: [DGX Spark / Other ARM64 / x86_64]
-
-## Checklist
-
-- [ ] Code follows style guidelines
-- [ ] Documentation updated
-- [ ] No secrets/PII in code
-- [ ] Tested on target hardware
-```
+5. Address review feedback in additional commits (no force-push to a shared PR branch unless the reviewer asks).
 
 ## Configuration Contributions
 
-When proposing configuration changes:
+When proposing a recipe or env change:
 
-1. **Document the use case**: What workload/scenario is this for?
-2. **Include benchmarks**: Performance metrics before/after
-3. **Note tradeoffs**: Memory vs speed, quality vs throughput, etc.
-4. **Test stability**: Run for extended periods, check for memory leaks
-5. **Specify hardware**: DGX Spark specs, GPU memory, etc.
+1. Document the use case (single-user coding, batched eval, etc.).
+2. Include before/after benchmarks: decode tok/s at batch 1, TTFT at 1 K-token prompt, peak memory per node.
+3. Note tradeoffs (latency vs throughput, quality vs speed).
+4. Verify stability for at least one extended session.
+5. Specify the exact hardware, driver, and vLLM commit you tested against.
 
-### Example Configuration Change
-
-```yaml
-# Before (baseline)
-- "-c"
-- "131072"  # 128K context
-- "-np"
-- "4"      # 4 parallel slots
-Performance: ~18 tok/s generation, ~54 tok/s prompt processing
-
-# After (proposed)
-- "-c"
-- "98304"  # 96K context
-- "-np"
-- "2"      # 2 parallel slots
-Performance: ~10 tok/s, 10GB VRAM
-Tradeoff: Fewer concurrent requests, more context per request
-Use case: Large codebase analysis with deep context
-```
-
-## Documentation Contributions
-
-Good documentation is crucial for this project:
-
-- **README updates**: Keep installation/usage sections current
-- **Troubleshooting**: Add common issues and solutions
-- **Configuration guides**: Document optimization strategies
-- **Hardware compatibility**: Note tested platforms and limitations
-- **Performance tuning**: Share benchmarks and best practices
-
-## Hardware-Specific Notes
-
-### DGX Spark (Primary Target)
-
-- **Grace Blackwell GB10**: 128GB unified memory, 20 ARM64 cores
-- **MoE models**: Use `-ngl 999` to offload all layers to GPU (unified memory handles full model)
-- **Context limits**: Test up to 96K with 4 parallel slots
-- **Memory monitoring**: Watch unified memory usage via `nvidia-smi`
-
-### Other Platforms
-
-If testing on other hardware, please note:
-
-- CPU architecture (ARM64 / x86_64)
-- GPU model and VRAM
-- Total system memory
-- Driver version
-- Any required configuration changes
-
-## Issue Reporting
-
-### Bug Reports
+## Bug Reports
 
 Include:
 
-- **Description**: What happened vs what you expected
-- **Steps to reproduce**: Minimal example to trigger the bug
-- **Environment**: Hardware, OS, Docker version, driver version
-- **Logs**: Relevant error messages (`docker compose logs`)
-- **Configuration**: Your `docker-compose.yml` (if modified)
-
-### Feature Requests
-
-Include:
-
-- **Use case**: What problem does this solve?
-- **Proposed solution**: How would this work?
-- **Alternatives**: Other approaches you considered
-- **Impact**: Who benefits from this feature?
+- **Description**: actual vs expected behavior.
+- **Reproduction**: minimal `curl` or OpenCode command that triggers it.
+- **Environment**: GB10 driver version on both nodes (`nvidia-smi`), submodule commit hash, recipe file contents, `docker/.env` with secrets redacted.
+- **Logs**: `./scripts/tail-logs.sh` output around the failure, especially `NCCL_DEBUG=INFO` lines.
+- **Topology**: confirm `Using network IB` (not `Socket`); confirm MTU 9000 on the IB link.
 
 ## Code of Conduct
 
-- Be respectful and inclusive
-- Focus on constructive feedback
-- Help others learn and improve
-- Give credit where due
-
-## Questions?
-
-- **GitHub Issues**: For bugs and feature requests
-- **GitHub Discussions**: For general questions and ideas
-- **README**: Start here for setup and usage
+- Be respectful and inclusive.
+- Focus on constructive feedback.
+- Give credit where due.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
-
-Thank you for contributing to MiniMax Inference Server! 🚀
+By contributing, you agree your contributions are licensed under Apache License 2.0.

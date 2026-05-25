@@ -4,8 +4,8 @@
     "~/.config/opencode/AGENTS.md",
     "~/.config/opencode/opencode-style.md"
   ],
-  "model": "llama-cpp/minimax-m2",
-  "small_model": "llama-cpp/minimax-m2",
+  "model": "vllm/cyankiwi/MiniMax-M2.7-AWQ-4bit",
+  "small_model": "vllm/cyankiwi/MiniMax-M2.7-AWQ-4bit",
   "permission": {
     "*": "allow",
     "edit": "ask",
@@ -23,47 +23,35 @@
   },
   "agent": {
     "build": {
-      "temperature": 0.2,
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 40,
       "maxSteps": 8,
       "parse_tool_calls": true,
       "parallel_tool_calls": false
     },
     "plan": {
-      "temperature": 0.1,
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 40,
       "maxSteps": 4,
       "parse_tool_calls": true,
       "parallel_tool_calls": false
     }
   },
   "provider": {
-    "ollama": {
+    "vllm": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (Local)",
-      "options": {
-        "baseURL": "http://localhost:11434/v1"
-      },
-      "models": {
-        "minimax-m2": {
-          "name": "MiniMax M2.1 REAP-40 Q6_K",
-          "limit": {
-            "context": 32768,
-            "output": 8192
-          }
-        }
-      }
-    },
-    "llama-cpp": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "llama.cpp (Local)",
+      "name": "vLLM (DGX Spark Cluster)",
       "options": {
         "baseURL": "http://localhost:8080/v1",
         "timeout": 300000
       },
       "models": {
-        "minimax-m2": {
-          "name": "MiniMax M2.1 REAP-40 Q6_K (llama.cpp)",
+        "cyankiwi/MiniMax-M2.7-AWQ-4bit": {
+          "name": "MiniMax M2.7 AWQ-4bit (vLLM TP=2)",
           "limit": {
-            "context": 131072,
+            "context": 196608,
             "output": 8192
           }
         }
