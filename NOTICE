@@ -5,26 +5,26 @@ This product includes software developed by the MiniMax Inference Project.
 
 This software contains components from the following open source projects:
 
-llama.cpp
-  Copyright (c) 2023-2024 llama.cpp contributors
-  License: MIT License
-  https://github.com/ggml-org/llama.cpp
+vLLM
+  Copyright (c) vLLM Project contributors
+  License: Apache License 2.0
+  https://github.com/vllm-project/vllm
 
-NVIDIA CUDA and Container Toolkit
+spark-vllm-docker
+  Copyright (c) eugr and contributors
+  License: MIT License
+  https://github.com/eugr/spark-vllm-docker
+
+NVIDIA CUDA, NCCL, and Container Toolkit
   Copyright (c) NVIDIA Corporation
   https://github.com/NVIDIA/nvidia-container-toolkit
 
-Docker Compose
-  Copyright (c) Docker Inc.
-  License: Apache License 2.0
-  https://github.com/docker/compose
-
-MiniMax M2 Model
+MiniMax M2.7 Model
   Copyright (c) MiniMax AI
   The model is used under its respective license terms.
-  Model quantizations by mradermacher on HuggingFace.
 
 Special thanks to:
-- ARDGE Labs for the DGX Spark optimized llama.cpp Docker image
-- The llama.cpp community for ARM64 and Blackwell GPU support
-- NVIDIA for the DGX Spark hardware and optimization guidance
+- vLLM project for the inference engine
+- eugr for the dual-Spark launcher and recipes
+- NVIDIA for the DGX Spark hardware, NCCL tuning guidance, and playbooks
+- MiniMax team for the M2.7 model and tool-calling format
