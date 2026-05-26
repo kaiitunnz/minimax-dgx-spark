@@ -20,15 +20,15 @@
 git clone --recursive https://github.com/kaiitunnz/minimax-dgx-spark.git
 cd minimax-dgx-spark
 
-cp docker/.env.example docker/.env
-$EDITOR docker/.env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_TOKEN, ...
+cp .env.example .env
+$EDITOR .env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_TOKEN, ...
 
 ./scripts/verify-cluster.sh         # NCCL/IB/MTU/SSH preflight
 ./scripts/start.sh                  # Boots head + worker
 curl -fsS http://localhost:8080/health
 ```
 
-The submodule under `third_party/spark-vllm-docker/` ships the container image and SSH-based launcher; this repo owns the recipe overlay (`recipes/minimax-m2.7-awq.dgxs.yaml`), env, wrappers, tests, and docs.
+The submodule under `3rdparty/spark-vllm-docker/` ships the container image and SSH-based launcher; this repo owns the recipe overlay (`recipes/minimax-m2.7-awq.dgxs.yaml`), env, wrappers, tests, and docs.
 
 ## Code Style
 
@@ -75,13 +75,13 @@ chore(submodule): bump spark-vllm-docker to <commit-sha>
 
 ## Submodule Updates
 
-`third_party/spark-vllm-docker/` is pinned to a specific upstream commit. To bump:
+`3rdparty/spark-vllm-docker/` is pinned to a specific upstream commit. To bump:
 
 ```bash
-cd third_party/spark-vllm-docker
+cd 3rdparty/spark-vllm-docker
 git fetch && git checkout <new-commit>
 cd ../..
-git add third_party/spark-vllm-docker
+git add 3rdparty/spark-vllm-docker
 git commit -m "chore(submodule): bump spark-vllm-docker to <short-sha>"
 ```
 
@@ -129,7 +129,7 @@ Include:
 
 - **Description**: actual vs expected behavior.
 - **Reproduction**: minimal `curl` or OpenCode command that triggers it.
-- **Environment**: GB10 driver version on both nodes (`nvidia-smi`), submodule commit hash, recipe file contents, `docker/.env` with secrets redacted.
+- **Environment**: GB10 driver version on both nodes (`nvidia-smi`), submodule commit hash, recipe file contents, `.env` with secrets redacted.
 - **Logs**: `./scripts/tail-logs.sh` output around the failure, especially `NCCL_DEBUG=INFO` lines.
 - **Topology**: confirm `Using network IB` (not `Socket`); confirm MTU 9000 on the IB link.
 

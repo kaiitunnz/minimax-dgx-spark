@@ -1,5 +1,5 @@
 # Recipe: MiniMax-M2.7-AWQ for dual-DGX-Spark (TP=2).
-# Overlay of third_party/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml.
+# Overlay of 3rdparty/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml.
 # Local overrides vs upstream:
 #   - port 8080         (matches OpenCode endpoint and tests/)
 #   - flashinfer attn   (+8% decode on this cluster)
@@ -10,7 +10,7 @@ name: MiniMax-M2.7-AWQ-DGXSparkx2
 description: vLLM serving MiniMax-M2.7-AWQ across 2x DGX Spark via tensor parallelism
 
 model: cyankiwi/MiniMax-M2.7-AWQ-4bit
-container: vllm-node
+container: spark-vllm
 cluster_only: true
 mods: []
 

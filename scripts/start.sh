@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Boot the dual-DGX-Spark vLLM cluster with our recipe overlay.
-# Reads docker/.env, invokes third_party/spark-vllm-docker/run-recipe.sh.
+# Reads .env, invokes 3rdparty/spark-vllm-docker/run-recipe.sh.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-readonly ENV_FILE="$PROJECT_DIR/docker/.env"
+readonly ENV_FILE="$PROJECT_DIR/.env"
 readonly RECIPE="${RECIPE:-$PROJECT_DIR/recipes/minimax-m2.7-awq.dgxs.yaml}"
-readonly RUN_RECIPE="$PROJECT_DIR/third_party/spark-vllm-docker/run-recipe.sh"
+readonly RUN_RECIPE="$PROJECT_DIR/3rdparty/spark-vllm-docker/run-recipe.sh"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-[[ -f "$ENV_FILE" ]]    || die "Missing $ENV_FILE — copy from docker/.env.example and edit"
+[[ -f "$ENV_FILE" ]]    || die "Missing $ENV_FILE — copy from .env.example and edit"
 [[ -f "$RECIPE" ]]      || die "Missing $RECIPE"
 [[ -x "$RUN_RECIPE" ]]  || die "Missing $RUN_RECIPE — did you run \`git submodule update --init\`?"
 

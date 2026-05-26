@@ -21,7 +21,7 @@ Run MiniMax M2.7 (AWQ-4bit) across 2× DGX Spark to serve an OpenAI-compatible A
 - vLLM via `eugr/spark-vllm-docker` submodule (MIT). Upstream provides image build, SSH-based cluster launcher, recipe runner.
 - vLLM source ref pinned to `v0.21.1rc0` via `scripts/build-image.sh`.
 - Recipe overlay `recipes/minimax-m2.7-awq.dgxs.yaml` inherits eugr's `minimax-m2.7-awq.yaml`, sets TP=2/PP=1, pins port 8080, and selects `flashinfer` attention.
-- Container image `vllm-node` built locally and propagated to the peer.
+- Container image `spark-vllm` built locally and propagated to the peer.
 
 ## Acceptance criteria
 

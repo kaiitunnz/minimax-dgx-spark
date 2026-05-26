@@ -14,7 +14,7 @@ Two DGX Sparks, each with two ConnectX-7 cards × two ports = four RoCE links pe
 | Card 2 port 0 (`enP2p1s0f0np0`) | `192.168.100.14` | `192.168.100.15` |
 | Card 2 port 1 (`enP2p1s0f1np1`) | `192.168.200.16` | `192.168.200.17` |
 
-`docker/.env.example` configures the full 4-cable mesh via `IB_IF`. mDNS resolves the worker's `.local` name on every fabric; ARP learning is established at boot.
+`.env.example` configures the full 4-cable mesh via `IB_IF`. mDNS resolves the worker's `.local` name on every fabric; ARP learning is established at boot.
 
 ## Mandatory configuration
 
@@ -44,7 +44,7 @@ Must print `gx10-db5e` without a password or key-passphrase prompt.
 
 ## `IB_IF` — HCA names, not netdev names
 
-`IB_IF` in `docker/.env` is passed verbatim into `NCCL_IB_HCA` inside the container. **NCCL_IB_HCA wants the InfiniBand HCA names** (column 1 of `ibdev2netdev`), not the matching netdev names (column 5). Mixing them up gives this failure mode:
+`IB_IF` in `.env` is passed verbatim into `NCCL_IB_HCA` inside the container. **NCCL_IB_HCA wants the InfiniBand HCA names** (column 1 of `ibdev2netdev`), not the matching netdev names (column 5). Mixing them up gives this failure mode:
 
 ```
 NCCL INFO NET/IB : No device found.
@@ -64,7 +64,7 @@ IB_IF=rocep1s0f0,roceP2p1s0f0,rocep1s0f1,roceP2p1s0f1
 
 ## NCCL environment
 
-Set via `CONTAINER_*` keys in `docker/.env`; the launcher forwards them as `-e FOO=bar` into the container (stripping the `CONTAINER_` prefix).
+Set via `CONTAINER_*` keys in `.env`; the launcher forwards them as `-e FOO=bar` into the container (stripping the `CONTAINER_` prefix).
 
 | Variable | Value | Why |
 | --- | --- | --- |
@@ -73,7 +73,7 @@ Set via `CONTAINER_*` keys in `docker/.env`; the launcher forwards them as `-e F
 | `CONTAINER_NCCL_IB_GID_INDEX` | `3` | RoCE v2 GID index per NVIDIA's DGX Spark playbook |
 | `CONTAINER_NCCL_DEBUG` | `INFO` | Surface transport selection during bring-up; can be dropped once stable |
 
-`NCCL_IB_HCA` and `NCCL_SOCKET_IFNAME` are derived by the launcher from `IB_IF` / `ETH_IF` in `docker/.env`.
+`NCCL_IB_HCA` and `NCCL_SOCKET_IFNAME` are derived by the launcher from `IB_IF` / `ETH_IF` in `.env`.
 
 ## Verification
 

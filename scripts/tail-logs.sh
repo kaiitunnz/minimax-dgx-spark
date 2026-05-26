@@ -4,8 +4,8 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-readonly ENV_FILE="$PROJECT_DIR/docker/.env"
-readonly CONTAINER_NAME="${CONTAINER_NAME:-vllm_node}"
+readonly ENV_FILE="$PROJECT_DIR/.env"
+readonly CONTAINER_NAME="${CONTAINER_NAME:-spark-vllm}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 

@@ -51,11 +51,11 @@ Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-comp
 git clone --recursive https://github.com/kaiitunnz/minimax-dgx-spark.git
 cd minimax-dgx-spark
 
-cp docker/.env.example docker/.env
-$EDITOR docker/.env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_HOME, CONTAINER_HF_TOKEN
+cp .env.example .env
+$EDITOR .env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_HOME, CONTAINER_HF_TOKEN
 
 ./scripts/verify-cluster.sh         # Preflight: NCCL, IB, MTU, SSH
-./scripts/build-image.sh            # Build vllm-node image and copy to peer
+./scripts/build-image.sh            # Build spark-vllm image and copy to peer
 ./scripts/start.sh                  # ~5–10 min weight load
 ./scripts/status.sh
 ```
@@ -64,8 +64,8 @@ $EDITOR docker/.env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_HOME, CON
 
 ```
 minimax-dgx-spark/
-├── docker/                          # Env template + invocation notes
-├── third_party/
+├── .env.example                     # Cluster topology + RoCE / HF / NCCL env
+├── 3rdparty/
 │   └── spark-vllm-docker/           # git submodule (eugr's launcher, recipes, image)
 ├── recipes/                         # AWQ (default) and NVFP4 overlays
 ├── scripts/                         # start, stop, status, verify-cluster, tail-logs, benchmark*
@@ -89,7 +89,7 @@ Inherits the upstream `recipes/minimax-m2.7-awq.yaml` and pins:
 
 Inherited from upstream: `--trust-remote-code`, `--max-model-len 196608`, `--load-format fastsafetensors`, `--enable-auto-tool-choice --tool-call-parser minimax_m2`, `--reasoning-parser minimax_m2`, `--distributed-executor-backend ray`.
 
-### Environment (`docker/.env`)
+### Environment (`.env`)
 
 | Variable | Purpose |
 | --- | --- |
@@ -123,7 +123,7 @@ vLLM's `minimax_m2` tool parser emits clean per-`<invoke>` deltas; OpenCode cons
 
 ```bash
 ./scripts/verify-cluster.sh         # NCCL all-reduce, IB link, MTU, SSH preflight
-./scripts/start.sh                  # Head + worker via SSH; sources docker/.env
+./scripts/start.sh                  # Head + worker via SSH; sources .env
 ./scripts/status.sh                 # Both nodes — GPU, container, /health, /v1/models
 ./scripts/tail-logs.sh              # Multiplexed head + worker logs
 ./scripts/stop.sh                   # Teardown on both nodes

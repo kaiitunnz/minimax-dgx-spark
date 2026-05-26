@@ -9,7 +9,7 @@ Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-comp
 **Target Hardware**: 2× NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory each), networked via ConnectX-7 (RoCE, MTU 9000).
 **Model**: MiniMax M2.7 AWQ-4bit (~140 GB, 229B total / 10B active MoE, 200K context).
 **Parallelism**: Tensor parallel (TP=2, PP=1) over RoCE. With NCCL on real IB RDMA the per-token all-reduce stays cheap; the pipeline bubble of a 10B-active MoE at batch 1 costs more.
-**Inference Stack**: vLLM via `eugr/spark-vllm-docker` (git submodule under `third_party/`), recipe overlay at `recipes/minimax-m2.7-awq.dgxs.yaml`.
+**Inference Stack**: vLLM via `eugr/spark-vllm-docker` (git submodule under `3rdparty/`), recipe overlay at `recipes/minimax-m2.7-awq.dgxs.yaml`.
 
 ## Commands
 
@@ -60,16 +60,14 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```
 minimax-dgx-spark/
-├── docker/                          # Env template + invocation notes (no compose; submodule owns runtime)
-│   ├── .env.example
-│   └── README.md
-├── third_party/
+├── .env.example                     # Cluster topology + RoCE / HF / NCCL env (copy to .env)
+├── 3rdparty/
 │   └── spark-vllm-docker/           # git submodule (eugr's launcher, recipes, image)
 ├── recipes/
-│   └── minimax-m2.7-awq.dgxs.yaml   # Overlay: PP=2/TP=1, --port 8080, our model path
+│   └── minimax-m2.7-awq.dgxs.yaml   # Overlay: TP=2/PP=1, --port 8080, flashinfer attn
 ├── scripts/                         # Thin wrappers over the submodule's launch-cluster.sh
 ├── tests/                           # Live smoke tests (gated by *_TESTS_LIVE env vars)
-├── docs/m2.7-dual-spark/            # spec, plan, runbook, networking
+├── docs/m2.7-dual-spark/            # spec, runbook, networking
 └── config/                          # OpenCode style/permissions, example provider config
 ```
 
@@ -77,7 +75,7 @@ The submodule owns the container image and launcher; this repo owns the recipe o
 
 ## Multi-Node Operations
 
-- Head node is `CLUSTER_NODES[0]` in `docker/.env`. All scripts are run on the head; the launcher SSHes into the worker.
+- Head node is `CLUSTER_NODES[0]` in `.env`. All scripts are run on the head; the launcher SSHes into the worker.
 - Passwordless SSH from head → worker is required (the launcher does not handle prompts).
 - NCCL must use IB (`NCCL_DEBUG=INFO` logs `Using network IB`). If it falls back to `Socket`, fix `NCCL_IB_HCA`, `NCCL_IB_GID_INDEX=3`, `NCCL_SOCKET_IFNAME` before retrying.
 - Driver pin: NVIDIA 580.x. Avoid 590.x (CUDA-graph deadlock on GB10).

@@ -9,8 +9,8 @@ git clone --recursive https://github.com/kaiitunnz/minimax-dgx-spark.git
 cd minimax-dgx-spark
 
 # 1. Configure
-cp docker/.env.example docker/.env
-$EDITOR docker/.env                       # CLUSTER_NODES, IB_IF, HF_HOME, CONTAINER_HF_TOKEN
+cp .env.example .env
+$EDITOR .env                       # CLUSTER_NODES, IB_IF, HF_HOME, CONTAINER_HF_TOKEN
 
 # 2. Preflight (driver, MTU, SSH, RoCE, HF cache)
 ./scripts/verify-cluster.sh
@@ -21,8 +21,8 @@ $EDITOR docker/.env                       # CLUSTER_NODES, IB_IF, HF_HOME, CONTA
 # 4. Download AWQ weights to both nodes (~120 GB). Model name must precede -c
 #    (eugr's positional parser is greedy).
 export HF_HOME=/huggingface
-./third_party/spark-vllm-docker/hf-download.sh \
-  --config docker/.env \
+./3rdparty/spark-vllm-docker/hf-download.sh \
+  --config .env \
   cyankiwi/MiniMax-M2.7-AWQ-4bit \
   -c <worker-host>
 
@@ -70,7 +70,7 @@ FORMAT=json ./scripts/benchmark-llama-benchy.sh > bench.json
 ### NCCL logs `Using network Socket` instead of `Using network IB`
 
 Symptom: decode throughput < 5 tok/s, or `NET/IB : No device found` followed by `Failed to initialize NET plugin IB` in the launcher output.
-Cause: `IB_IF` in `docker/.env` contains netdev names (`enp1s0f0np0`) instead of HCA names (`rocep1s0f0`). `NCCL_IB_HCA` wants HCA names; netdev names yield "no device found" and silent socket fallback.
+Cause: `IB_IF` in `.env` contains netdev names (`enp1s0f0np0`) instead of HCA names (`rocep1s0f0`). `NCCL_IB_HCA` wants HCA names; netdev names yield "no device found" and silent socket fallback.
 Fix: set `IB_IF` to the HCA-name list, e.g. `rocep1s0f0,roceP2p1s0f0,rocep1s0f1,roceP2p1s0f1` for the full 4-cable mesh. Re-run `./scripts/verify-cluster.sh`, then `./scripts/stop.sh && ./scripts/start.sh`.
 
 ### vLLM hangs at "Capturing CUDA graphs" on first boot
@@ -81,13 +81,13 @@ Fix: add `--enforce-eager` to the recipe `command:` block. Decode drops ~5–10 
 
 ### `huggingface_hub.errors.GatedRepoError` during weight load
 
-Cause: `CONTAINER_HF_TOKEN` in `docker/.env` is empty or invalid. SSH non-interactive sessions don't source `.bashrc`, so the token must be set explicitly in `.env`.
+Cause: `CONTAINER_HF_TOKEN` in `.env` is empty or invalid. SSH non-interactive sessions don't source `.bashrc`, so the token must be set explicitly in `.env`.
 Fix: populate `CONTAINER_HF_TOKEN`.
 
 ### `Error: Model name is required` from `hf-download.sh`
 
 Cause: `-c <host>` is greedy and consumes positional args.
-Fix: pass the model name before `-c <host>`. Example: `./hf-download.sh --config docker/.env cyankiwi/MiniMax-M2.7-AWQ-4bit -c <worker-host>`.
+Fix: pass the model name before `-c <host>`. Example: `./hf-download.sh --config .env cyankiwi/MiniMax-M2.7-AWQ-4bit -c <worker-host>`.
 
 ### Decode throughput unexpectedly low
 
@@ -107,9 +107,9 @@ Fix: wait. `tail-logs.sh` shows progress. Hard ceiling on first boot is ~10 min;
 Bump the submodule:
 
 ```bash
-cd third_party/spark-vllm-docker
+cd 3rdparty/spark-vllm-docker
 git fetch && git checkout <new-commit>
-cd ../.. && git add third_party/spark-vllm-docker
+cd ../.. && git add 3rdparty/spark-vllm-docker
 git commit -m "chore(submodule): bump spark-vllm-docker to <short-sha>"
 ```
 
@@ -117,7 +117,7 @@ Diff the overlay against upstream after each bump and re-apply the local overrid
 
 ```bash
 diff recipes/minimax-m2.7-awq.dgxs.yaml \
-     third_party/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml
+     3rdparty/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml
 ```
 
 ## Benchmarks
@@ -158,4 +158,4 @@ The NVIDIA dev forum (thread 366324) reports higher `tg128` for the same model c
 
 ## Cleanup
 
-`docker/.env` is gitignored. The AWQ weights at `/huggingface/hub/models--cyankiwi--MiniMax-M2.7-AWQ-4bit/` (~120 GB per node) can be removed with `huggingface-cli delete-cache --disable-tui`. Container images live in `docker image ls | grep vllm-node`.
+`.env` is gitignored. The AWQ weights at `/huggingface/hub/models--cyankiwi--MiniMax-M2.7-AWQ-4bit/` (~120 GB per node) can be removed with `huggingface-cli delete-cache --disable-tui`. Container images live in `docker image ls | grep spark-vllm`.

@@ -6,7 +6,7 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-readonly ENV_FILE="$PROJECT_DIR/docker/.env"
+readonly ENV_FILE="$PROJECT_DIR/.env"
 readonly EXPECTED_MTU=9000
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -145,7 +145,7 @@ for node in "${nodes[@]}"; do
 done
 echo
 
-# 5. HF cache visibility on every node. Reads HF_HOME from docker/.env so the
+# 5. HF cache visibility on every node. Reads HF_HOME from .env so the
 # check matches what the launcher will actually mount.
 hf_home_from_env=$(get_env HF_HOME)
 hf_home_check="${hf_home_from_env:-$HOME/.cache/huggingface}"
@@ -157,7 +157,7 @@ for node in "${nodes[@]}"; do
     if ssh -o BatchMode=yes "$node" "test -d \"$hf_home_check\""; then
       pass "$node: present"
     else
-      fail "$node: $hf_home_check missing — create it or update HF_HOME in docker/.env"
+      fail "$node: $hf_home_check missing — create it or update HF_HOME in .env"
     fi
   fi
 done

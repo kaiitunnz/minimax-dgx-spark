@@ -4,8 +4,8 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-readonly ENV_FILE="$PROJECT_DIR/docker/.env"
-readonly LAUNCHER="$PROJECT_DIR/third_party/spark-vllm-docker/launch-cluster.sh"
+readonly ENV_FILE="$PROJECT_DIR/.env"
+readonly LAUNCHER="$PROJECT_DIR/3rdparty/spark-vllm-docker/launch-cluster.sh"
 readonly HEAD_PORT=8080
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -40,11 +40,11 @@ for node in "${node_arr[@]}"; do
   echo "=== $node ==="
   if is_local "$node"; then
     nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu --format=csv,noheader 2>/dev/null || echo "  GPU: unavailable"
-    docker ps --filter "name=vllm" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | head -5 || true
+    docker ps --filter "name=spark-vllm" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | head -5 || true
   else
     ssh -o BatchMode=yes -o ConnectTimeout=5 "$node" '
       nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu --format=csv,noheader 2>/dev/null || echo "  GPU: unavailable"
-      docker ps --filter "name=vllm" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | head -5 || true
+      docker ps --filter "name=spark-vllm" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | head -5 || true
     ' || echo "  SSH to $node failed"
   fi
   echo

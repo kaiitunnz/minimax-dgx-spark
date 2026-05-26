@@ -4,8 +4,8 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-readonly ENV_FILE="$PROJECT_DIR/docker/.env"
-readonly LAUNCHER="$PROJECT_DIR/third_party/spark-vllm-docker/launch-cluster.sh"
+readonly ENV_FILE="$PROJECT_DIR/.env"
+readonly LAUNCHER="$PROJECT_DIR/3rdparty/spark-vllm-docker/launch-cluster.sh"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
