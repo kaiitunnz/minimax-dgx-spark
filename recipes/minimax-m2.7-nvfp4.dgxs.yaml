@@ -1,19 +1,9 @@
-# Recipe: MiniMax-M2.7-NVFP4 for dual-DGX-Spark (TP=2)
-#
-# NVFP4 is the FP4 quant tuned for NVIDIA Blackwell. On dual DGX Spark with
-# NCCL on real IB RDMA, TP=2 is the proven topology — same as our AWQ recipe.
-#
-# Source for the flag set: NVIDIA dev forum thread "MiniMax M2.7 NVFP4 recipe
-# / benchmarks" (366324). The community resolved earlier vLLM sm_120 issues
-# (#30163, #32826, #42516) by explicitly selecting backends rather than
-# relying on auto-detection:
-#   - --quantization modelopt_fp4    (instead of auto-detecting from config)
-#   - --attention-backend flashinfer (avoids the cutlass FP4 sm_120 path)
-#   - --moe-backend cutlass          (stable MoE kernels)
-#   - VLLM_NVFP4_GEMM_BACKEND=cutlass (env, pins GEMM path)
-#
-# Reported decode: ~25.7 tok/s vs our AWQ TP=2 baseline of ~22 tok/s.
-# Both numbers are single-stream batch 1.
+# Recipe: MiniMax-M2.7-NVFP4 for dual-DGX-Spark (TP=2).
+# NVFP4 is the FP4 quant tuned for NVIDIA Blackwell. Backends are pinned
+# explicitly (--quantization modelopt_fp4, --attention-backend flashinfer,
+# --moe-backend flashinfer_cutlass) to avoid the sm_120 auto-detect paths
+# that historically hit cutlass FP4 / EP / PP issues.
+# Currently slower than the AWQ recipe on this cluster; see runbook.md.
 
 recipe_version: "1"
 name: MiniMax-M2.7-NVFP4-DGXSparkx2

@@ -8,7 +8,7 @@ Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-comp
 
 **Target Hardware**: 2× NVIDIA DGX Spark (GB10 Grace Blackwell, 128 GB unified memory each), networked via ConnectX-7 (RoCE, MTU 9000).
 **Model**: MiniMax M2.7 AWQ-4bit (~140 GB, 229B total / 10B active MoE, 200K context).
-**Parallelism**: Pipeline parallel (PP=2, TP=1) over RoCE — TP=2 collapses on ConnectX-7's all-reduce latency.
+**Parallelism**: Tensor parallel (TP=2, PP=1) over RoCE. With NCCL on real IB RDMA the per-token all-reduce stays cheap; the pipeline bubble of a 10B-active MoE at batch 1 costs more.
 **Inference Stack**: vLLM via `eugr/spark-vllm-docker` (git submodule under `third_party/`), recipe overlay at `recipes/minimax-m2.7-awq.dgxs.yaml`.
 
 ## Commands

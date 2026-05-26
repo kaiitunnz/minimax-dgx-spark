@@ -21,13 +21,11 @@ if ! grep -qE '^CLUSTER_NODES=.+,' "$ENV_FILE"; then
   die "CLUSTER_NODES in $ENV_FILE must list at least two comma-separated nodes"
 fi
 
-# Propagate HF_HOME from .env into our env so the launcher's
-# `${HF_HOME:-$HOME/.cache/huggingface}` resolves to the same path on both
-# nodes (SSH non-interactive sessions don't source .bashrc).
+# Propagate HF_HOME from .env so the launcher's
+# `${HF_HOME:-$HOME/.cache/huggingface}` resolves consistently on both nodes
+# (SSH non-interactive sessions don't source .bashrc).
 hf_home_from_env=$(grep -E '^HF_HOME=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-if [[ -n "$hf_home_from_env" ]]; then
-  export HF_HOME="$hf_home_from_env"
-fi
+[[ -n "$hf_home_from_env" ]] && export HF_HOME="$hf_home_from_env"
 
 log "Booting cluster via $RUN_RECIPE"
 log "  config:  $ENV_FILE"

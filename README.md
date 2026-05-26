@@ -4,9 +4,9 @@ Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-comp
 
 ## Overview
 
-- **Model**: MiniMax M2.7 (released 2026-03-18), AWQ-4bit quant. 229B total / 10B active MoE, 200K context. ≈ GPT-5.3-Codex on SWE-Pro; designed for agentic tool use.
+- **Model**: MiniMax M2.7, AWQ-4bit quant (`cyankiwi/MiniMax-M2.7-AWQ-4bit`, ~140 GB). 229B total / 10B active MoE, 200K context. Designed for agentic tool use.
 - **Hardware**: 2× NVIDIA DGX Spark, each with a GB10 Grace Blackwell superchip and 128 GB unified memory. ConnectX-7 RoCE 4-cable mesh between the nodes (two cards × two ports each side).
-- **Parallelism**: tensor parallel across the two Sparks (TP=2, PP=1). With NCCL on real IB RDMA (DMA-BUF on GB10), the per-token all-reduce is cheap enough that TP edges out PP for single-stream decode on a 10B-active MoE. See `docs/m2.7-dual-spark/runbook.md` for the empirical bench.
+- **Parallelism**: tensor parallel across the two Sparks (TP=2, PP=1). With NCCL on real IB RDMA (DMA-BUF on GB10) the per-token all-reduce stays cheap enough that TP edges out PP for single-stream decode on a 10B-active MoE.
 - **Stack**: vLLM via `eugr/spark-vllm-docker` (vendored as a git submodule), with a recipe overlay that pins `--port 8080` for OpenCode compatibility.
 
 ## Hardware Requirements
@@ -43,20 +43,19 @@ Dual-DGX-Spark vLLM deployment of MiniMax M2.7 (AWQ-4bit) serving an OpenAI-comp
    hf auth login
    ```
 
-4. **ConnectX-7 wired and configured** between the two nodes, MTU 9000 on both ends. See `docs/m2.7-dual-spark/networking.md` (post-Phase-4) for the validated setup.
+4. **ConnectX-7 wired and configured** between the two nodes, MTU 9000 on both ends. See `docs/m2.7-dual-spark/networking.md`.
 
 ## Quick Start
-
-Available once Phase 2 lands:
 
 ```bash
 git clone --recursive https://github.com/kaiitunnz/minimax-dgx-spark.git
 cd minimax-dgx-spark
 
 cp docker/.env.example docker/.env
-$EDITOR docker/.env                 # Set CLUSTER_NODES, ETH_IF, IB_IF, HF_TOKEN, ...
+$EDITOR docker/.env                 # CLUSTER_NODES, ETH_IF, IB_IF, HF_HOME, CONTAINER_HF_TOKEN
 
 ./scripts/verify-cluster.sh         # Preflight: NCCL, IB, MTU, SSH
+./scripts/build-image.sh            # Build vllm-node image and copy to peer
 ./scripts/start.sh                  # ~5–10 min weight load
 ./scripts/status.sh
 ```
@@ -66,15 +65,12 @@ $EDITOR docker/.env                 # Set CLUSTER_NODES, ETH_IF, IB_IF, HF_TOKEN
 ```
 minimax-dgx-spark/
 ├── docker/                          # Env template + invocation notes
-│   ├── .env.example
-│   └── README.md
 ├── third_party/
 │   └── spark-vllm-docker/           # git submodule (eugr's launcher, recipes, image)
-├── recipes/
-│   └── minimax-m2.7-awq.dgxs.yaml   # Overlay: PP=2/TP=1, --port 8080
-├── scripts/                         # start, stop, status, verify-cluster, tail-logs, benchmark
+├── recipes/                         # AWQ (default) and NVFP4 overlays
+├── scripts/                         # start, stop, status, verify-cluster, tail-logs, benchmark*
 ├── tests/                           # Live smoke tests (*_TESTS_LIVE env-gated)
-├── docs/m2.7-dual-spark/            # spec, plan, runbook, networking
+├── docs/m2.7-dual-spark/            # spec, runbook, networking
 └── config/                          # OpenCode style/permissions, example provider config
 ```
 
@@ -84,32 +80,26 @@ The submodule owns the container image and SSH-based launcher; this repo owns th
 
 ### Recipe overlay (`recipes/minimax-m2.7-awq.dgxs.yaml`)
 
-Inherits the upstream `recipes/minimax-m2.7-awq.yaml` and overrides:
+Inherits the upstream `recipes/minimax-m2.7-awq.yaml` and pins:
 
-- `--pipeline-parallel-size 2 --tensor-parallel-size 1` (PP wins on ConnectX-7).
-- `--port 8080` (matches the existing OpenCode endpoint).
-- Model pinned to the chosen AWQ build (set in Phase 2).
+- `tensor_parallel: 2`, `pipeline_parallel: 1`.
+- `--port 8080` (matches the OpenCode endpoint).
+- `--attention-backend flashinfer` (~8% decode over vLLM's auto pick).
+- `cyankiwi/MiniMax-M2.7-AWQ-4bit` as the served model.
 
-Inherited from upstream:
-
-- `--trust-remote-code` (M2.7 ships custom modeling files).
-- `--max-model-len 196608`.
-- `--load-format fastsafetensors`.
-- `--enable-auto-tool-choice --tool-call-parser minimax_m2`.
-- `--reasoning-parser minimax_m2`.
-- `--distributed-executor-backend ray`.
+Inherited from upstream: `--trust-remote-code`, `--max-model-len 196608`, `--load-format fastsafetensors`, `--enable-auto-tool-choice --tool-call-parser minimax_m2`, `--reasoning-parser minimax_m2`, `--distributed-executor-backend ray`.
 
 ### Environment (`docker/.env`)
 
 | Variable | Purpose |
 | --- | --- |
-| `CLUSTER_NODES` | Comma-separated hostnames; first entry is the head |
-| `ETH_IF` | Control-plane NIC (used by Ray) |
-| `IB_IF` | RoCE NIC (comma-list if twin-port) |
+| `CLUSTER_NODES` | Comma-separated node IPs; first entry is the head |
+| `ETH_IF` | Control-plane NIC (used by Ray and SSH) |
+| `IB_IF` | RoCE HCA names (NOT netdev names — see `docs/m2.7-dual-spark/networking.md`) |
 | `MASTER_PORT` | Ray master port (default `29501`) |
-| `RECIPE` | Path to the recipe YAML used by the launcher |
-| `HF_TOKEN` | Hugging Face token for weight pulls |
-| `MODEL_CACHE` | Per-node cache path or shared NFS mount |
+| `HF_HOME` | Host HF cache directory; mounted into the container |
+| `CONTAINER_HF_TOKEN` | HF token forwarded into the container |
+| `CONTAINER_NCCL_*` | NCCL tuning (DMA-BUF, GID index, debug) |
 
 ## OpenCode Integration
 
@@ -127,26 +117,27 @@ Validate tool routing:
 ./scripts/opencode-tool-regression.sh
 ```
 
-vLLM's `minimax_m2` tool parser emits clean per-`<invoke>` deltas; OpenCode consumes them without fragmentation. If you need the experimental `minimax_m2_append_think` reasoning parser, use a nightly vLLM build.
+vLLM's `minimax_m2` tool parser emits clean per-`<invoke>` deltas; OpenCode consumes them without fragmentation.
 
 ## Server Management
 
 ```bash
-./scripts/verify-cluster.sh   # NCCL all-reduce, IB link, MTU, SSH preflight
-./scripts/start.sh            # Head + worker via SSH; sources docker/.env
-./scripts/status.sh           # Both nodes — GPU, container, /health, /v1/models
-./scripts/tail-logs.sh        # Multiplexed head + worker logs
-./scripts/stop.sh             # Teardown on both nodes
-./scripts/benchmark.sh        # Tokens/sec and latency (BASE_URL/MODEL overridable)
+./scripts/verify-cluster.sh         # NCCL all-reduce, IB link, MTU, SSH preflight
+./scripts/start.sh                  # Head + worker via SSH; sources docker/.env
+./scripts/status.sh                 # Both nodes — GPU, container, /health, /v1/models
+./scripts/tail-logs.sh              # Multiplexed head + worker logs
+./scripts/stop.sh                   # Teardown on both nodes
+./scripts/benchmark.sh              # Quick sequential-curl smoke check
+./scripts/benchmark-llama-benchy.sh # llama-bench style pp/tg numbers
 ```
 
-See `docs/m2.7-dual-spark/runbook.md` (post-Phase-4) for day-to-day ops, failure modes, and recovery procedures.
+See `docs/m2.7-dual-spark/runbook.md` for day-to-day ops, failure modes, and recovery procedures.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| NCCL log shows `Using network: Socket` | RoCE env not set | Set `NCCL_IB_HCA`, `NCCL_IB_GID_INDEX=3`, `NCCL_SOCKET_IFNAME` in `.env` |
+| NCCL log shows `Using network: Socket` | `IB_IF` contains netdev names instead of HCA names | Set `IB_IF` to the HCA-name list (`rocep1s0f0,...`); see `docs/m2.7-dual-spark/networking.md` |
 | vLLM hangs at CUDA-graph capture | Known GB10 bug | Add `--enforce-eager` to the recipe |
 | Decode tok/s < 10 | TCP fallback or driver mismatch | Verify `NCCL_DEBUG=INFO` shows IB; confirm 580.x driver on both nodes |
 | Model load > 15 min | Page-fault thrash on unified memory | Use `--load-format fastsafetensors` (already set); avoid `mmap` |
@@ -155,14 +146,13 @@ See `docs/m2.7-dual-spark/runbook.md` (post-Phase-4) for day-to-day ops, failure
 ## Model Information
 
 - **Model**: [`MiniMaxAI/MiniMax-M2.7`](https://huggingface.co/MiniMaxAI/MiniMax-M2.7) (base weights, BF16/FP8)
-- **Quant**: AWQ-4bit (~140 GB across 2 nodes); exact HF repo pinned in `recipes/minimax-m2.7-awq.dgxs.yaml`
-- **AWQ vs NVFP4**: NVFP4 (`lukealonso/MiniMax-M2.7-NVFP4`) does run on this cluster, but with `--moe-backend cutlass` it benches at ~14.7 tok/s vs AWQ's ~22 tok/s. Recipe kept at `recipes/minimax-m2.7-nvfp4.dgxs.yaml`; run via `RECIPE=… ./scripts/start.sh`. See `docs/m2.7-dual-spark/runbook.md` for the full bench.
+- **Quant served**: `cyankiwi/MiniMax-M2.7-AWQ-4bit` (~140 GB across the two nodes)
+- **NVFP4 alternative**: `lukealonso/MiniMax-M2.7-NVFP4` works on this cluster but currently benches below AWQ. Recipe at `recipes/minimax-m2.7-nvfp4.dgxs.yaml`; run via `RECIPE=… ./scripts/start.sh`. See `docs/m2.7-dual-spark/runbook.md` for numbers.
 
 ## References
 
 - [vLLM dual-Spark recipes](https://github.com/eugr/spark-vllm-docker)
 - [NVIDIA DGX Spark playbooks](https://github.com/NVIDIA/dgx-spark-playbooks)
-- [StorageReview: dual-Spark PP vs TP](https://www.storagereview.com/review/nvidia-dgx-spark-cluster-review-distributed-inference-on-dell-gigabyte-and-hp)
 - [MiniMax M2.7 on Hugging Face](https://huggingface.co/MiniMaxAI/MiniMax-M2.7)
 - [MiniMax M2.7 NVIDIA blog (NIM, NVFP4)](https://developer.nvidia.com/blog/minimax-m2-7-advances-scalable-agentic-workflows-on-nvidia-platforms-for-complex-ai-applications/)
 

@@ -1,23 +1,13 @@
-# Recipe: MiniMax-M2.7-AWQ for dual-DGX-Spark (TP=2)
-#
+# Recipe: MiniMax-M2.7-AWQ for dual-DGX-Spark (TP=2).
 # Overlay of third_party/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml.
-# Diverges from upstream only by pinning the server port to 8080. TP/PP split
-# matches upstream (TP=2, PP=1).
-#
-# Phase 3 benchmark on the gx10-548e ↔ gx10-db5e pair (2026-05-26, NCCL on
-# NET/IB across the 4-cable RoCE mesh) measured TP=2 at ~22-23 tok/s vs PP=2
-# at ~21 tok/s on the default benchmark prompt — single-stream decode.
-# TP=2's per-token all-reduce stayed cheap because IB RDMA was actually
-# online; PP=2's pipeline bubble cost more for a 10B-active MoE at batch 1.
-# This contradicts StorageReview's PP-favorable measurement on GPT-OSS-120B,
-# which ran without RDMA. See docs/m2.7-dual-spark/runbook.md.
-#
-# Why port 8080: matches existing config/opencode.json.example and
-# tests/test_opencode_style.py so OpenCode integration needs no URL change.
+# Local overrides vs upstream:
+#   - port 8080         (matches OpenCode endpoint and tests/)
+#   - flashinfer attn   (+8% decode on this cluster)
+# See docs/m2.7-dual-spark/runbook.md for benchmark numbers.
 
 recipe_version: "1"
 name: MiniMax-M2.7-AWQ-DGXSparkx2
-description: vLLM serving MiniMax-M2.7-AWQ across 2x DGX Spark via pipeline parallelism
+description: vLLM serving MiniMax-M2.7-AWQ across 2x DGX Spark via tensor parallelism
 
 model: cyankiwi/MiniMax-M2.7-AWQ-4bit
 container: vllm-node

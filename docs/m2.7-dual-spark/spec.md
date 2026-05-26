@@ -6,9 +6,9 @@ Run MiniMax M2.7 (AWQ-4bit) across 2× DGX Spark to serve an OpenAI-compatible A
 
 ## Why this shape
 
-- M2.7 (229B total / 10B active MoE, ≈ GPT-5.3-Codex on SWE-Pro) needs > 128 GB of weights + KV for any quant tier whose quality justifies running it. AWQ-4bit (≈ 122 GB on disk) fits across two 128 GB Sparks; smaller quants fit on one node but waste M2.7's coding gains; larger quants don't fit even on two.
-- The 4-cable RoCE mesh + DMA-BUF gives NCCL real IB RDMA (verified `NET/IB`, not Socket fallback). With RDMA online TP=2 single-stream beats PP=2 for a 10B-active MoE at batch 1 because the per-token all-reduce stays cheap while the pipeline bubble dominates. StorageReview's PP-favorable measurement was on a Socket-fallback cluster — not representative for a properly-configured DGX Spark pair.
-- Tool-calling and reasoning parsers are M2.7-specific (`minimax_m2` in vLLM stable). The recipe must wire them up explicitly or OpenCode's tool routing breaks.
+- M2.7 (229B total / 10B active MoE) needs > 128 GB of weights + KV for any quant tier worth running. AWQ-4bit (≈ 122 GB on disk) fits across two 128 GB Sparks; smaller quants fit on one node but waste M2.7's coding gains; larger quants don't fit even on two.
+- The 4-cable RoCE mesh + DMA-BUF gives NCCL real IB RDMA (verified `NET/IB`, not Socket fallback). With RDMA online TP=2 single-stream beats PP=2 for a 10B-active MoE at batch 1: the per-token all-reduce stays cheap while the pipeline bubble dominates.
+- Tool-calling and reasoning parsers are M2.7-specific (`minimax_m2` in vLLM stable). The recipe wires them up explicitly so OpenCode's tool routing works.
 
 ## Hardware constraint
 
@@ -19,26 +19,26 @@ Run MiniMax M2.7 (AWQ-4bit) across 2× DGX Spark to serve an OpenAI-compatible A
 ## Software stack
 
 - vLLM via `eugr/spark-vllm-docker` submodule (MIT). Upstream provides image build, SSH-based cluster launcher, recipe runner.
-- Our recipe overlay `recipes/minimax-m2.7-awq.dgxs.yaml` inherits eugr's `minimax-m2.7-awq.yaml` and swaps TP=2 for PP=2/TP=1, pins port 8080.
-- Container image `vllm-node` built locally via `build-and-copy.sh -c` and propagated to the peer.
+- vLLM source ref pinned to `v0.21.1rc0` via `scripts/build-image.sh`.
+- Recipe overlay `recipes/minimax-m2.7-awq.dgxs.yaml` inherits eugr's `minimax-m2.7-awq.yaml`, sets TP=2/PP=1, pins port 8080, and selects `flashinfer` attention.
+- Container image `vllm-node` built locally and propagated to the peer.
 
 ## Acceptance criteria
 
 1. `./scripts/verify-cluster.sh` exits clean: SSH key-auth on every node, driver in 580.x band, RoCE MTU 9000, RoCE ping between nodes on every IB interface, HF cache present at `HF_HOME` on every node.
 2. `./scripts/start.sh` boots both nodes; first `curl http://localhost:8080/v1/models` after ≤ 10 min returns the M2.7 alias.
 3. `NCCL_DEBUG=INFO` logs show `Using network IB` — never `Socket`.
-4. Sustained decode ≥ 20 tok/s for a 256-token completion at batch 1; TTFT ≤ 5 s for a 1 K-token prompt. (Measured 22 tok/s on TP=2 with NCCL on IB — see `runbook.md`. Single-stream AWQ on sm_120 is the realistic ceiling until NVFP4 lands cleanly.)
+4. Sustained decode ≥ 20 tok/s for a 256-token completion at batch 1; TTFT ≤ 5 s for a 1 K-token prompt.
 5. `./scripts/opencode-tool-regression.sh` passes — OpenCode picks `bash` (not `glob`) for file listing.
 6. `VLLM_TESTS_LIVE=1 pytest tests/test_vllm_health.py` passes — `/health`, `/v1/models`, and a tool-call prompt all behave.
 
-## Deferred work (watch list)
+## Deferred work
 
-- **NVFP4 perf parity with AWQ**: `lukealonso/MiniMax-M2.7-NVFP4` runs cleanly on this cluster as of 2026-05-26 — the earlier sm_120 blockers (#30163, #32826, #42516) no longer reproduce in the vLLM build eugr's image ships. But measured **17.8 tok/s (flashinfer_cutlass MoE) and 14.7 tok/s (cutlass MoE) vs AWQ's 22 tok/s**. The NVIDIA forum thread 366324 reports ≥24 tok/s with the same flashinfer_cutlass config — our gap is likely vLLM/driver/firmware-related. Both recipes are kept in-repo (`recipes/minimax-m2.7-{awq,nvfp4}.dgxs.yaml`); AWQ is the default until NVFP4 catches up.
-- **Expert parallelism** (`--enable-expert-parallel`) once stable on sm_120. Could unlock MoE-aware sharding.
-- **Speculative decoding** via SGLang MTP on the worker node if Phase 3 throughput is below target — proven +80% on 4-Spark Gemma in NVIDIA dev forum #370354.
-- **AWQ-of-M2.7 rebuild** if `cyankiwi/MiniMax-M2.7-AWQ-4bit` proves inadequate (it's a community quant, not from MiniMax).
+- **NVFP4 perf parity with AWQ**: `lukealonso/MiniMax-M2.7-NVFP4` runs cleanly on this cluster but currently benches below AWQ. Recipe kept in-repo as the future Blackwell-tuned path. See `runbook.md` for current numbers.
+- **Expert parallelism** (`--enable-expert-parallel`) once stable on sm_120.
+- **Speculative decoding** via SGLang MTP on the worker if throughput becomes the bottleneck.
 
 ## Non-goals
 
-- Single-node fallback. The llama.cpp Q6_K stack was excised in commit `<phase-1-sha>` and is not coming back. If the dual-Spark setup is unavailable, the answer is to fix it, not to revive a parallel single-node stack.
+- Single-node fallback. The dual-Spark setup is the only supported topology.
 - Multi-user serving, fine-tuning, web UI. Single-developer agentic coding only.

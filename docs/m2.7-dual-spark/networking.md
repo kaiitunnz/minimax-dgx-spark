@@ -1,12 +1,12 @@
 # Networking — Dual-DGX-Spark ConnectX-7 setup
 
-Captured during Phase 0 verification on the `gx10-548e` ↔ `gx10-db5e` pair, 2026-05-26. Re-run `scripts/verify-cluster.sh` after any hardware or driver change.
+Re-run `scripts/verify-cluster.sh` after any hardware or driver change.
 
 ## Topology
 
 Two DGX Sparks, each with two ConnectX-7 cards × two ports = four RoCE links per node. The links form two `/24` fabrics; each fabric carries traffic from both cards' matching ports.
 
-| | gx10-548e (head) | gx10-db5e (worker) |
+| | Head | Worker |
 | --- | --- | --- |
 | LAN | `192.168.6.170` (`enP7s7`) | `192.168.6.171` (`enP7s7`) |
 | Card 1 port 0 (`enp1s0f0np0`) | `192.168.100.10` | `192.168.100.11` |
@@ -14,9 +14,7 @@ Two DGX Sparks, each with two ConnectX-7 cards × two ports = four RoCE links pe
 | Card 2 port 0 (`enP2p1s0f0np0`) | `192.168.100.14` | `192.168.100.15` |
 | Card 2 port 1 (`enP2p1s0f1np1`) | `192.168.200.16` | `192.168.200.17` |
 
-This is more bandwidth than the single-card-per-side reference in [StorageReview's dual-Spark review](https://www.storagereview.com/review/nvidia-dgx-spark-cluster-review-distributed-inference-on-dell-gigabyte-and-hp). Our `docker/.env.example` starts with **card 2 only** (`enP2p1s0f0np0,enP2p1s0f1np1`); expand to all four after the Phase 3 baseline bench.
-
-ARP confirms peer learning over card 2's ports specifically (peer MAC OUI `30:c5:99:bf:db:**`). Avahi mDNS resolves `gx10-db5e.local` on every fabric.
+`docker/.env.example` configures the full 4-cable mesh via `IB_IF`. mDNS resolves the worker's `.local` name on every fabric; ARP learning is established at boot.
 
 ## Mandatory configuration
 
@@ -32,12 +30,7 @@ Then re-run `./scripts/verify-cluster.sh` from the head; the MTU section must sh
 
 ### NVIDIA driver 580.x
 
-Driver 590.x triggers a CUDA-graph deadlock during NCCL bring-up on GB10. Both nodes must be on a 580.x release. Current versions on the pair:
-
-- gx10-548e: 580.142
-- gx10-db5e: 580.95.05
-
-Both qualify. Aligning to a single minor isn't required, but is worth doing if either node hits an obscure NCCL issue.
+Driver 590.x triggers a CUDA-graph deadlock during NCCL bring-up on GB10. Both nodes must be on a 580.x release. Aligning the minor version is not required but is worth doing if either node hits an obscure NCCL issue.
 
 ### Passwordless SSH between nodes
 
@@ -78,7 +71,7 @@ Set via `CONTAINER_*` keys in `docker/.env`; the launcher forwards them as `-e F
 | `CONTAINER_NCCL_IGNORE_CPU_AFFINITY` | `1` | Avoid CPU-affinity churn that stalls NCCL on Grace |
 | `CONTAINER_NCCL_DMABUF_ENABLE` | `1` | Use DMA-BUF GPUDirect path on GB10; ~22 GB/s effective. Falls back to CPU staging if unavailable |
 | `CONTAINER_NCCL_IB_GID_INDEX` | `3` | RoCE v2 GID index per NVIDIA's DGX Spark playbook |
-| `CONTAINER_NCCL_DEBUG` | `INFO` | Surface transport selection during bring-up; drop after Phase 3 once stable |
+| `CONTAINER_NCCL_DEBUG` | `INFO` | Surface transport selection during bring-up; can be dropped once stable |
 
 `NCCL_IB_HCA` and `NCCL_SOCKET_IFNAME` are derived by the launcher from `IB_IF` / `ETH_IF` in `docker/.env`.
 

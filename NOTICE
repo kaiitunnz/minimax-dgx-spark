@@ -22,9 +22,3 @@ NVIDIA CUDA, NCCL, and Container Toolkit
 MiniMax M2.7 Model
   Copyright (c) MiniMax AI
   The model is used under its respective license terms.
-
-Special thanks to:
-- vLLM project for the inference engine
-- eugr for the dual-Spark launcher and recipes
-- NVIDIA for the DGX Spark hardware, NCCL tuning guidance, and playbooks
-- MiniMax team for the M2.7 model and tool-calling format
