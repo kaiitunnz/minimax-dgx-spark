@@ -105,22 +105,23 @@ Fix: wait. `tail-logs.sh` shows progress. Hard ceiling on first boot is ~10 min;
 
 All numbers are single-stream decode at batch 1, default benchmark prompt ("Write a short Python hello world program.", 256 max tokens), NCCL on `NET/IB` (RDMA via DMA-BUF on GB10).
 
-### Topology bench (recipes/minimax-m2.7-awq.dgxs.yaml)
+### Topology bench (recipes/minimax-m2.7-awq.dgxs.yaml, default attention backend)
 
-| Config | Cold req | Warm reqs | Notes |
+| Config | Cold | Warm | Notes |
 | --- | --- | --- | --- |
-| **TP=2, PP=1** *(locked in)* | 2.37 tok/s (130 tok in 55 s) | **22.96 / 21.83 / 23.17 tok/s** | Sustained ≈ 22 tok/s |
-| PP=2, TP=1 | 1.33 tok/s (103 tok in 77 s) | 21.0 / 21.3 tok/s | Sustained ≈ 21 tok/s |
+| **TP=2, PP=1** *(locked in)* | 2.37 tok/s | 22.96 / 21.83 / 23.17 tok/s | Sustained ≈ 22 tok/s |
+| PP=2, TP=1 | 1.33 tok/s | 21.0 / 21.3 tok/s | Sustained ≈ 21 tok/s |
 
 **Winner: TP=2** by a hair. The StorageReview measurement that motivated PP=2 was on a Socket-fallback NCCL configuration; with real IB RDMA the per-token all-reduce stays cheap and the pipeline bubble for a 10B-active MoE at batch 1 costs more.
 
-### Quant bench (TP=2 locked, varying recipe)
+### Quant / backend bench (TP=2 locked)
 
-| Recipe | MoE backend | Warm decode | Notes |
-| --- | --- | --- | --- |
-| **`minimax-m2.7-awq.dgxs.yaml`** *(default)* | (auto, AWQ kernels) | **22 tok/s** | `cyankiwi/MiniMax-M2.7-AWQ-4bit` |
-| `minimax-m2.7-nvfp4.dgxs.yaml` | `flashinfer_cutlass` | 17.8 tok/s | `lukealonso/MiniMax-M2.7-NVFP4`. Matches forum thread 366324's "ekkis profile" config but lands well below their reported ~24 tok/s — likely vLLM/driver/firmware differences |
-| (NVFP4 alt, not in repo) | `cutlass` | 14.7 tok/s | Earliest NVFP4 attempt; superseded by flashinfer_cutlass |
+| Recipe | Attention | MoE backend | Warm decode | Notes |
+| --- | --- | --- | --- | --- |
+| **`minimax-m2.7-awq.dgxs.yaml`** *(default)* | `flashinfer` | (auto, MARLIN) | **23.7 tok/s** | `cyankiwi/MiniMax-M2.7-AWQ-4bit`; ~8% faster than vLLM's default attention |
+| `minimax-m2.7-awq.dgxs.yaml` (prior) | (default) | (auto, MARLIN) | 22.0 tok/s | Pre-flashinfer baseline |
+| `minimax-m2.7-nvfp4.dgxs.yaml` | `flashinfer` | `flashinfer_cutlass` | 17.8 tok/s | `lukealonso/MiniMax-M2.7-NVFP4`. Matches forum thread 366324's "ekkis profile" but lands well below their reported ~24 tok/s — likely vLLM/driver/firmware differences |
+| (NVFP4 alt, not in repo) | `flashinfer` | `cutlass` | 14.7 tok/s | Earliest NVFP4 attempt; superseded by flashinfer_cutlass |
 
 The NVFP4 recipe is kept as an alternative because (a) NVFP4 is the future-tuned path for Blackwell and (b) the `flashinfer_cutlass` MoE variant may close the gap. Run NVFP4 explicitly with:
 
