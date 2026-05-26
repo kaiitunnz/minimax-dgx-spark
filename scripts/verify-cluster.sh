@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Preflight checks for the dual-DGX-Spark vLLM cluster. Run before start.sh.
+# Preflight checks for the DGX-Spark vLLM cluster. Run before start.sh.
 # Verifies: SSH key-auth, driver match, MTU on RoCE ports, RoCE ping between
-# nodes, and shared HF cache visibility.
+# nodes, and shared HF cache visibility. Single-node (CLUSTER_NODES with one
+# entry) skips the inter-node SSH and RoCE-ping sections.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -121,29 +122,35 @@ done
 echo
 
 # 4. RoCE ping between this node and each peer, on each interface.
+# Skip entirely on single-node deployments (nothing to ping).
 log "RoCE ping from $(hostname) to peers"
-me=$(hostname)
-for node in "${nodes[@]}"; do
-  is_local "$node" && continue
-  for hca in "${ib_ifs[@]}"; do
-    nd=$(hca_to_netdev "localhost" "$hca")
-    [[ -z "$nd" ]] && { fail "$me $hca: no local netdev"; continue; }
-    my_ip=$(ip -4 addr show "$nd" 2>/dev/null | awk '/inet / {print $2}' | head -1 | cut -d/ -f1)
-    [[ -z "$my_ip" ]] && { fail "$me $hca ($nd): no IPv4"; continue; }
-    my_subnet=$(echo "$my_ip" | awk -F. '{printf "%d.%d.%d.", $1, $2, $3}')
-    peer_ip=$(ssh -o BatchMode=yes "$node" "ip -4 addr show | awk '/inet ${my_subnet}/ {print \$2}' | head -1 | cut -d/ -f1")
-    if [[ -z "$peer_ip" ]]; then
-      fail "$node has no IP on subnet ${my_subnet}0/24 (via $hca)"
-      continue
-    fi
-    if ping -c 2 -W 2 -I "$nd" "$peer_ip" >/dev/null 2>&1; then
-      pass "$me $hca ($nd) -> $node $peer_ip"
-    else
-      fail "$me $hca ($nd) -> $node $peer_ip — no reply"
-    fi
+if [[ ${#nodes[@]} -le 1 ]]; then
+  pass "single-node deployment — no peers to ping"
+  echo
+else
+  me=$(hostname)
+  for node in "${nodes[@]}"; do
+    is_local "$node" && continue
+    for hca in "${ib_ifs[@]}"; do
+      nd=$(hca_to_netdev "localhost" "$hca")
+      [[ -z "$nd" ]] && { fail "$me $hca: no local netdev"; continue; }
+      my_ip=$(ip -4 addr show "$nd" 2>/dev/null | awk '/inet / {print $2}' | head -1 | cut -d/ -f1)
+      [[ -z "$my_ip" ]] && { fail "$me $hca ($nd): no IPv4"; continue; }
+      my_subnet=$(echo "$my_ip" | awk -F. '{printf "%d.%d.%d.", $1, $2, $3}')
+      peer_ip=$(ssh -o BatchMode=yes "$node" "ip -4 addr show | awk '/inet ${my_subnet}/ {print \$2}' | head -1 | cut -d/ -f1")
+      if [[ -z "$peer_ip" ]]; then
+        fail "$node has no IP on subnet ${my_subnet}0/24 (via $hca)"
+        continue
+      fi
+      if ping -c 2 -W 2 -I "$nd" "$peer_ip" >/dev/null 2>&1; then
+        pass "$me $hca ($nd) -> $node $peer_ip"
+      else
+        fail "$me $hca ($nd) -> $node $peer_ip — no reply"
+      fi
+    done
   done
-done
-echo
+  echo
+fi
 
 # 5. HF cache visibility on every node. Reads HF_HOME from .env so the
 # check matches what the launcher will actually mount.

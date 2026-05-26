@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Boot the dual-DGX-Spark vLLM cluster with our recipe overlay.
+# Boot the DGX-Spark vLLM cluster with the recipe overlay.
 # Reads .env, invokes 3rdparty/spark-vllm-docker/run-recipe.sh.
+# A one-entry CLUSTER_NODES runs single-node automatically (the recipe's
+# cluster_only must be false, TP=1 / PP=1). SOLO=1 forces single-node even when
+# CLUSTER_NODES lists two or more nodes.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +17,11 @@ readonly RUN_RECIPE="$PROJECT_DIR/3rdparty/spark-vllm-docker/run-recipe.sh"
 # instead (cluster ties to the shell; `docker logs` stays empty).
 readonly FOREGROUND="${FOREGROUND:-0}"
 
+# Force single-node operation, skipping Ray and peer launch even when
+# CLUSTER_NODES lists peers. A one-entry CLUSTER_NODES already runs single-node
+# without this. The recipe's cluster_only must be false.
+readonly SOLO="${SOLO:-0}"
+
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
@@ -21,9 +29,10 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 [[ -f "$RECIPE" ]]      || die "Missing $RECIPE"
 [[ -x "$RUN_RECIPE" ]]  || die "Missing $RUN_RECIPE — did you run \`git submodule update --init\`?"
 
-# Sanity: confirm CLUSTER_NODES is set so we fail before docker churn.
-if ! grep -qE '^CLUSTER_NODES=.+,' "$ENV_FILE"; then
-  die "CLUSTER_NODES in $ENV_FILE must list at least two comma-separated nodes"
+# Sanity: CLUSTER_NODES must be set. One entry implies single-node operation,
+# two or more implies a Ray-managed cluster.
+if ! grep -qE '^CLUSTER_NODES=[^[:space:]]' "$ENV_FILE"; then
+  die "CLUSTER_NODES not set in $ENV_FILE"
 fi
 
 # Propagate HF_HOME from .env so the launcher's
@@ -37,8 +46,9 @@ log "  config:  $ENV_FILE"
 log "  recipe:  $RECIPE"
 log "  HF_HOME: ${HF_HOME:-(unset, launcher will default to \$HOME/.cache/huggingface)}"
 
-daemon_flag=(--daemon)
-[[ "$FOREGROUND" == "1" ]] && daemon_flag=()
-log "  mode:    $([[ ${#daemon_flag[@]} -gt 0 ]] && echo daemon || echo foreground)"
+launcher_flags=()
+[[ "$FOREGROUND" != "1" ]] && launcher_flags+=(--daemon)
+[[ "$SOLO" == "1" ]] && launcher_flags+=(--solo)
+log "  mode:    $([[ "$FOREGROUND" == "1" ]] && echo foreground || echo daemon)$([[ "$SOLO" == "1" ]] && echo ', solo')"
 
-exec "$RUN_RECIPE" --config "$ENV_FILE" "${daemon_flag[@]}" "$RECIPE" "$@"
+exec "$RUN_RECIPE" --config "$ENV_FILE" "${launcher_flags[@]}" "$RECIPE" "$@"

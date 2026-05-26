@@ -47,6 +47,22 @@ Model load takes ~5–10 min from cold weights; subsequent boots benefit from pa
 
 OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`; copy it to `~/.config/opencode/opencode.json`.
 
+### Single-node mode
+
+A one-entry `CLUSTER_NODES` is detected as single-node by the launcher automatically — no flag needed. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example.dgxs1.yaml` is a template:
+
+```bash
+RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
+```
+
+`SOLO=1` is only needed to force solo when `CLUSTER_NODES` lists two or more nodes but you want to run on this one alone:
+
+```bash
+SOLO=1 RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
+```
+
+Pick a model whose weights fit in 128 GB.
+
 ### Benchmark tools
 
 - **`benchmark.sh`** issues a handful of `/v1/chat/completions` requests and reports `time_total` and `tokens/sec`. Use as the post-boot smoke check.

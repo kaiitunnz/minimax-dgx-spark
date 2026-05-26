@@ -90,6 +90,7 @@ Include a one-line note in the commit body explaining what upstream change motiv
 ## Recipe Overlay Convention
 
 - One file per target deployment in `recipes/`: `<model>-<quant>.<suffix>.yaml`.
+- The suffix encodes the node topology: `dgxs` for the dual-Spark (2-node, Ray) target, `dgxs1` for single-node (solo, `cluster_only: false`).
 - Inherit from the upstream recipe; override only the fields specific to this hardware/setup (parallelism, port, model pin).
 - Comment each override line with a one-line justification — future readers need to know why we diverged from upstream.
 
