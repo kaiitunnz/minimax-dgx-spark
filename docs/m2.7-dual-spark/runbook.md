@@ -36,12 +36,34 @@ Model load takes ~5–10 min from cold weights; subsequent boots benefit from pa
 ## Daily operations
 
 ```bash
-./scripts/start.sh        # Boot the cluster
-./scripts/status.sh       # GPU + container + HTTP on every node
-./scripts/tail-logs.sh    # Multiplexed head + worker logs (Ctrl-C to detach)
-./scripts/benchmark.sh    # Tokens/sec & latency against http://localhost:8080/v1
-./scripts/stop.sh         # Tear down both containers
+./scripts/start.sh                # Boot the cluster
+./scripts/status.sh               # GPU + container + HTTP on every node
+./scripts/tail-logs.sh            # Multiplexed head + worker logs (Ctrl-C to detach)
+./scripts/benchmark.sh            # Quick smoke: 3-4 sequential curl reqs (~30 s)
+./scripts/benchmark-serve.sh      # Full `vllm bench serve` — TTFT/ITL/TPOT percentiles
+./scripts/stop.sh                 # Tear down both containers
 ```
+
+### `benchmark-serve.sh` usage notes
+
+Wraps vLLM's standard `vllm bench serve` (industry-standard online-serving benchmark — comparable across vLLM deployments). Sensible overrides via env:
+
+```bash
+# Single-stream latency (comparable to scripts/benchmark.sh semantics)
+MAX_CONCURRENCY=1 NUM_PROMPTS=8 ./scripts/benchmark-serve.sh
+
+# Realistic concurrent load (e.g. 8 users, Poisson arrivals at 2 req/s)
+DATASET=sharegpt NUM_PROMPTS=64 REQUEST_RATE=2 ./scripts/benchmark-serve.sh
+
+# Saturation burst (default)
+./scripts/benchmark-serve.sh      # random workload, 32 prompts, burst
+```
+
+Two caveats for the **`random`** dataset on our reasoning model (M2.7):
+- `minimax_m2` reasoning parser routes most generation into `reasoning_content`; vLLM bench's `Total generated tokens` only counts visible `content`, so total-token throughput looks artificially low. **Mean ITL is the reliable metric** for raw per-stream decode speed.
+- Random gibberish prompts produce short visible responses. Default has `--ignore-eos` set, but that only keeps the *raw* generation going — visible content tokens stay scarce.
+
+Prefer `DATASET=sharegpt` for realistic concurrent-load measurement.
 
 OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`; copy it to `~/.config/opencode/opencode.json` and it just works.
 
