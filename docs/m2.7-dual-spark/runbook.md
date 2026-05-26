@@ -50,10 +50,10 @@ OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`
 ### Benchmark tools
 
 - **`benchmark.sh`** issues a handful of `/v1/chat/completions` requests and reports `time_total` and `tokens/sec`. Use as the post-boot smoke check.
-- **`benchmark-llama-benchy.sh`** wraps [`eugr/llama-benchy`](https://github.com/eugr/llama-benchy) (same author as our submodule). Emits `llama-bench`-style `pp/tg` statistics against an OpenAI-compatible endpoint — the same format the NVIDIA dev forum uses. Real text from Project Gutenberg, with TTFR reporting that bypasses the `reasoning_content` accounting issue affecting other serving benchmarks.
+- **`benchmark-llama-benchy.sh`** wraps [`eugr/llama-benchy`](https://github.com/eugr/llama-benchy). Emits `llama-bench`-style `pp/tg` statistics against an OpenAI-compatible endpoint. Real text from Project Gutenberg, with TTFR reporting that bypasses the `reasoning_content` accounting issue affecting other serving benchmarks.
 
 ```bash
-# Forum-comparable defaults: pp2048 / tg128 / depth=0 / 3 runs / concurrency=1
+# Sensible defaults: pp2048 / tg128 / depth=0 / 3 runs / concurrency=1
 ./scripts/benchmark-llama-benchy.sh
 
 # Depth sweep — decode degradation under prefill context
