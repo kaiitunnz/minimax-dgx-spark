@@ -15,8 +15,9 @@ $EDITOR docker/.env                       # confirm CLUSTER_NODES, IB_IF, HF_HOM
 # 2. Preflight (driver, MTU, SSH, RoCE, HF cache)
 ./scripts/verify-cluster.sh
 
-# 3. Build the container image on head + propagate to peer
-( cd third_party/spark-vllm-docker && ./build-and-copy.sh -c )
+# 3. Build the container image with vLLM pinned to v0.21.1rc0,
+#    propagate to peer. ~25-40 min cold.
+./scripts/build-image.sh
 
 # 4. Download AWQ weights to both nodes (~120 GB, downloads to head then rsyncs)
 export HF_HOME=/huggingface              # already in .bashrc, but explicit is safer
@@ -114,14 +115,25 @@ All numbers are single-stream decode at batch 1, default benchmark prompt ("Writ
 
 **Winner: TP=2** by a hair. The StorageReview measurement that motivated PP=2 was on a Socket-fallback NCCL configuration; with real IB RDMA the per-token all-reduce stays cheap and the pipeline bubble for a 10B-active MoE at batch 1 costs more.
 
-### Quant / backend bench (TP=2 locked)
+### Quant / backend bench (TP=2 locked, image pinned to vLLM v0.21.1rc0)
 
 | Recipe | Attention | MoE backend | Warm decode | Notes |
 | --- | --- | --- | --- | --- |
 | **`minimax-m2.7-awq.dgxs.yaml`** *(default)* | `flashinfer` | (auto, MARLIN) | **23.7 tok/s** | `cyankiwi/MiniMax-M2.7-AWQ-4bit`; ~8% faster than vLLM's default attention |
 | `minimax-m2.7-awq.dgxs.yaml` (prior) | (default) | (auto, MARLIN) | 22.0 tok/s | Pre-flashinfer baseline |
-| `minimax-m2.7-nvfp4.dgxs.yaml` | `flashinfer` | `flashinfer_cutlass` | 17.8 tok/s | `lukealonso/MiniMax-M2.7-NVFP4`. Matches forum thread 366324's "ekkis profile" but lands well below their reported ~24 tok/s — likely vLLM/driver/firmware differences |
+| `minimax-m2.7-nvfp4.dgxs.yaml` | `flashinfer` | `flashinfer_cutlass` | 17.8 tok/s | `lukealonso/MiniMax-M2.7-NVFP4`. Matches forum thread 366324's "ekkis profile" but lands well below their reported ~24 tok/s |
 | (NVFP4 alt, not in repo) | `flashinfer` | `cutlass` | 14.7 tok/s | Earliest NVFP4 attempt; superseded by flashinfer_cutlass |
+
+### Tried and rejected — forum env tweaks
+
+We tested miken's full AWQ env config (forum thread 366324 post #17, claims 38.32 tok/s) and voktolom's full NVFP4 env config (~26-28 tok/s claimed). Neither moved our number:
+
+| Experiment | Their tg128 | Our chat-completions decode |
+| --- | --- | --- |
+| AWQ + `VLLM_USE_FLASHINFER_MOE_FP16=1 VLLM_USE_DEEP_GEMM=0 OMP_NUM_THREADS=4 NCCL_P2P_DISABLE=1` | 38.32 tok/s | 23.2 tok/s |
+| NVFP4 + `VLLM_FLASHINFER_MOE_BACKEND=throughput VLLM_FLOAT32_MATMUL_PRECISION=high OMP_NUM_THREADS=8` + `--disable-custom-all-reduce` | ~26 tok/s | 17.8 tok/s |
+
+Likely explanation: forum users bench with `llama-bench` style `tg128` (raw decode loop, no prefill, no reasoning parser overhead), while our `./scripts/benchmark.sh` issues real `/v1/chat/completions` requests through the `minimax_m2` reasoning parser. The two benchmark methodologies are not directly comparable. For OpenCode-style agentic workloads (the actual target), our numbers are the realistic ceiling.
 
 The NVFP4 recipe is kept as an alternative because (a) NVFP4 is the future-tuned path for Blackwell and (b) the `flashinfer_cutlass` MoE variant may close the gap. Run NVFP4 explicitly with:
 
