@@ -19,8 +19,9 @@ $EDITOR .env                       # CLUSTER_NODES, IB_IF, HF_HOME, CONTAINER_HF
 ./scripts/build-image.sh
 
 # 4. Download AWQ weights to both nodes (~120 GB). Model name must precede -c
-#    (eugr's positional parser is greedy).
-export HF_HOME=/huggingface
+#    (eugr's positional parser is greedy). Export HF_HOME so the download
+#    lands at the same path the launcher will mount (matches .env).
+export HF_HOME=~/.cache/huggingface
 ./3rdparty/spark-vllm-docker/hf-download.sh \
   --config .env \
   cyankiwi/MiniMax-M2.7-AWQ-4bit \
@@ -158,4 +159,4 @@ The NVIDIA dev forum (thread 366324) reports higher `tg128` for the same model c
 
 ## Cleanup
 
-`.env` is gitignored. The AWQ weights at `/huggingface/hub/models--cyankiwi--MiniMax-M2.7-AWQ-4bit/` (~120 GB per node) can be removed with `huggingface-cli delete-cache --disable-tui`. Container images live in `docker image ls | grep spark-vllm`.
+`.env` is gitignored. AWQ weights (~120 GB per node) live under `$HF_HOME/hub/models--cyankiwi--MiniMax-M2.7-AWQ-4bit/` and can be removed with `huggingface-cli delete-cache --disable-tui`. Container images: `docker image ls | grep spark-vllm`.

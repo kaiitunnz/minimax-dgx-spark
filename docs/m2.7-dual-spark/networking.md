@@ -8,11 +8,13 @@ Two DGX Sparks, each with two ConnectX-7 cards × two ports = four RoCE links pe
 
 | | Head | Worker |
 | --- | --- | --- |
-| LAN | `192.168.6.170` (`enP7s7`) | `192.168.6.171` (`enP7s7`) |
-| Card 1 port 0 (`enp1s0f0np0`) | `192.168.100.10` | `192.168.100.11` |
-| Card 1 port 1 (`enp1s0f1np1`) | `192.168.200.12` | `192.168.200.13` |
-| Card 2 port 0 (`enP2p1s0f0np0`) | `192.168.100.14` | `192.168.100.15` |
-| Card 2 port 1 (`enP2p1s0f1np1`) | `192.168.200.16` | `192.168.200.17` |
+| LAN | `10.0.0.10` (`<lan-if>`) | `10.0.0.11` (`<lan-if>`) |
+| Card 1 port 0 (`enp1s0f0np0`) | `10.0.100.10` | `10.0.100.11` |
+| Card 1 port 1 (`enp1s0f1np1`) | `10.0.200.10` | `10.0.200.11` |
+| Card 2 port 0 (`enP2p1s0f0np0`) | `10.0.100.20` | `10.0.100.21` |
+| Card 2 port 1 (`enP2p1s0f1np1`) | `10.0.200.20` | `10.0.200.21` |
+
+The fabric IPs above are illustrative. Pick two `/24`s for the RoCE fabrics, with each card's matching port (0 / 1) on the same fabric. `<lan-if>` is the LAN NIC on the host (it shows up in `ip -br link` as the only non-RoCE NIC).
 
 `.env.example` configures the full 4-cable mesh via `IB_IF`. mDNS resolves the worker's `.local` name on every fabric; ARP learning is established at boot.
 
@@ -37,10 +39,10 @@ Driver 590.x triggers a CUDA-graph deadlock during NCCL bring-up on GB10. Both n
 The eugr launcher SSHes from head to worker without prompts. The setup helper `~/scripts/discover-sparks.sh` (also host-scoped, not in this repo) generates `~/.ssh/id_ed25519_shared` and distributes it across the cluster. To verify:
 
 ```bash
-ssh -o BatchMode=yes gx10-db5e hostname
+ssh -o BatchMode=yes <worker-host> hostname
 ```
 
-Must print `gx10-db5e` without a password or key-passphrase prompt.
+Must print the worker's hostname without a password or key-passphrase prompt.
 
 ## `IB_IF` — HCA names, not netdev names
 
@@ -49,7 +51,7 @@ Must print `gx10-db5e` without a password or key-passphrase prompt.
 ```
 NCCL INFO NET/IB : No device found.
 NCCL INFO Failed to initialize NET plugin IB
-NCCL INFO NET/Socket : Using [0]enP7s7:192.168.6.170<0>
+NCCL INFO NET/Socket : Using [0]<lan-if>:<head-ip><0>
 ```
 
 NCCL falls back to TCP socket silently — the cluster appears to work, throughput is 10–20× slower than expected.
@@ -78,10 +80,10 @@ Set via `CONTAINER_*` keys in `.env`; the launcher forwards them as `-e FOO=bar`
 ## Verification
 
 ```bash
-./scripts/verify-cluster.sh           # full preflight
-ssh gx10-db5e ibdev2netdev            # confirm peer's RoCE state
-ping -I enP2p1s0f0np0 192.168.100.11  # RoCE fabric 1 ping
-ping -I enP2p1s0f1np1 192.168.200.13  # RoCE fabric 2 ping
+./scripts/verify-cluster.sh                       # full preflight
+ssh <worker-host> ibdev2netdev                    # confirm peer's RoCE state
+ping -I enP2p1s0f0np0 <worker-fabric1-card2-ip>   # RoCE fabric 1 ping
+ping -I enP2p1s0f1np1 <worker-fabric2-card2-ip>   # RoCE fabric 2 ping
 ```
 
 In container logs, `NCCL_DEBUG=INFO` should print a line like:
