@@ -47,6 +47,16 @@ Model load takes ~5–10 min from cold weights; subsequent boots benefit from pa
 
 OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`; copy it to `~/.config/opencode/opencode.json`.
 
+### Single-node mode
+
+The wrapper scripts accept a single-entry `CLUSTER_NODES`. Combined with `SOLO=1`, the launcher skips Ray and runs the recipe on the local node only. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example-single-spark.yaml` is a template:
+
+```bash
+SOLO=1 RECIPE=recipes/example-single-spark.yaml ./scripts/start.sh
+```
+
+MiniMax M2.7 AWQ-4bit (≈122 GB engine-loaded) does not fit alongside KV + activations on a single 128 GB Spark; pick a smaller model.
+
 ### Benchmark tools
 
 - **`benchmark.sh`** issues a handful of `/v1/chat/completions` requests and reports `time_total` and `tokens/sec`. Use as the post-boot smoke check.

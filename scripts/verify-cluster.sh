@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Preflight checks for the dual-DGX-Spark vLLM cluster. Run before start.sh.
+# Preflight checks for the DGX-Spark vLLM cluster. Run before start.sh.
 # Verifies: SSH key-auth, driver match, MTU on RoCE ports, RoCE ping between
-# nodes, and shared HF cache visibility.
+# nodes, and shared HF cache visibility. Single-node (CLUSTER_NODES with one
+# entry) skips the inter-node SSH and RoCE-ping sections.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -121,7 +122,12 @@ done
 echo
 
 # 4. RoCE ping between this node and each peer, on each interface.
+# Skip entirely on single-node deployments (nothing to ping).
 log "RoCE ping from $(hostname) to peers"
+if [[ ${#nodes[@]} -le 1 ]]; then
+  pass "single-node deployment — no peers to ping"
+  echo
+else
 me=$(hostname)
 for node in "${nodes[@]}"; do
   is_local "$node" && continue
@@ -144,6 +150,7 @@ for node in "${nodes[@]}"; do
   done
 done
 echo
+fi
 
 # 5. HF cache visibility on every node. Reads HF_HOME from .env so the
 # check matches what the launcher will actually mount.

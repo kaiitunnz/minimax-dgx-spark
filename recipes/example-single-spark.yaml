@@ -1,0 +1,41 @@
+# Example single-node DGX-Spark recipe (TP=1 / PP=1).
+# Use this as a template for any model whose weights fit in 128 GB.
+# Boot with:  SOLO=1 RECIPE=recipes/example-single-spark.yaml ./scripts/start.sh
+#
+# `cluster_only: false` is the key bit — the launcher's solo-mode guard rejects
+# recipes that hard-require Ray. TP=1 means no all-reduce, so no distributed
+# executor flag is added.
+
+recipe_version: "1"
+name: Example-Single-Spark
+description: vLLM serving on a single DGX Spark
+
+# Drop in your model here. MiniMax M2.7 AWQ (122 GB) does NOT fit single-node
+# once KV + activations are accounted for; pick something smaller. The model
+# id appears twice: at the top level (used by the launcher for download /
+# tokenizer checks) and inline in the `vllm serve …` command below. Keep them
+# in sync.
+model: <model-id>
+container: spark-vllm
+cluster_only: false
+mods: []
+
+env: {}
+
+defaults:
+  port: 8080
+  host: 0.0.0.0
+  tensor_parallel: 1
+  pipeline_parallel: 1
+  gpu_memory_utilization: 0.8
+  max_model_len: 65536
+
+command: |
+  vllm serve <model-id> \
+      --trust-remote-code \
+      --port {port} \
+      --host {host} \
+      --gpu-memory-utilization {gpu_memory_utilization} \
+      -tp {tensor_parallel} \
+      --max-model-len {max_model_len} \
+      --load-format fastsafetensors
