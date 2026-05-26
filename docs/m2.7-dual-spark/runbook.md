@@ -49,7 +49,13 @@ OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`
 
 ### Single-node mode
 
-The wrapper scripts accept a single-entry `CLUSTER_NODES`. Combined with `SOLO=1`, the launcher skips Ray and runs the recipe on the local node only. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example.dgxs1.yaml` is a template:
+A one-entry `CLUSTER_NODES` is detected as single-node by the launcher automatically — no flag needed. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example.dgxs1.yaml` is a template:
+
+```bash
+RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
+```
+
+`SOLO=1` is only needed to force solo when `CLUSTER_NODES` lists two or more nodes but you want to run on this one alone:
 
 ```bash
 SOLO=1 RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh

@@ -40,5 +40,4 @@ Run MiniMax M2.7 (AWQ-4bit) across 2× DGX Spark to serve an OpenAI-compatible A
 
 ## Non-goals
 
-- Single-node fallback. The dual-Spark setup is the only supported topology.
 - Multi-user serving, fine-tuning, web UI. Single-developer agentic coding only.

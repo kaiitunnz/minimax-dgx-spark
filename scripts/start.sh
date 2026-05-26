@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Boot the DGX-Spark vLLM cluster with our recipe overlay.
 # Reads .env, invokes 3rdparty/spark-vllm-docker/run-recipe.sh.
-# Single-node operation is supported: list one IP in CLUSTER_NODES, set SOLO=1,
-# and pick a recipe whose `cluster_only` is false (TP=1 / PP=1).
+# Single-node: a one-entry CLUSTER_NODES is detected as solo by the launcher
+# on its own; pick a recipe whose `cluster_only` is false (TP=1 / PP=1). SOLO=1
+# additionally forces solo when CLUSTER_NODES lists two or more nodes.
 set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,8 +17,9 @@ readonly RUN_RECIPE="$PROJECT_DIR/3rdparty/spark-vllm-docker/run-recipe.sh"
 # instead (cluster ties to the shell; `docker logs` stays empty).
 readonly FOREGROUND="${FOREGROUND:-0}"
 
-# Solo mode skips Ray + peer launch and lets the recipe run on this node alone.
-# The recipe must have `cluster_only: false`.
+# Force solo mode: skip Ray + peer launch even if CLUSTER_NODES lists peers.
+# Not needed for a genuine single-node CLUSTER_NODES — the launcher detects
+# that itself. The recipe must have `cluster_only: false` either way.
 readonly SOLO="${SOLO:-0}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
