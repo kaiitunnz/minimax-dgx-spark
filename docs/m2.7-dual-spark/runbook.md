@@ -36,34 +36,36 @@ Model load takes ~5–10 min from cold weights; subsequent boots benefit from pa
 ## Daily operations
 
 ```bash
-./scripts/start.sh                # Boot the cluster
-./scripts/status.sh               # GPU + container + HTTP on every node
-./scripts/tail-logs.sh            # Multiplexed head + worker logs (Ctrl-C to detach)
-./scripts/benchmark.sh            # Quick smoke: 3-4 sequential curl reqs (~30 s)
-./scripts/benchmark-serve.sh      # Full `vllm bench serve` — TTFT/ITL/TPOT percentiles
-./scripts/stop.sh                 # Tear down both containers
+./scripts/start.sh                    # Boot the cluster
+./scripts/status.sh                   # GPU + container + HTTP on every node
+./scripts/tail-logs.sh                # Multiplexed head + worker logs (Ctrl-C to detach)
+./scripts/benchmark.sh                # Quick smoke: 3-4 sequential curl reqs (~30 s)
+./scripts/benchmark-llama-benchy.sh   # llama-bench style pp/tg numbers, forum-comparable
+./scripts/stop.sh                     # Tear down both containers
 ```
 
-### `benchmark-serve.sh` usage notes
+### `benchmark-llama-benchy.sh` usage notes
 
-Wraps vLLM's standard `vllm bench serve` (industry-standard online-serving benchmark — comparable across vLLM deployments). Sensible overrides via env:
+Wraps [`eugr/llama-benchy`](https://github.com/eugr/llama-benchy) — same author as our `third_party/spark-vllm-docker` submodule. Emits `llama-bench`-style `pp/tg` statistics against any OpenAI-compatible endpoint, which is the format the NVIDIA dev forum (thread 366324) uses to compare MiniMax M2.7 results. Run via `uvx` — no install needed.
+
+Why this over `vllm bench serve` for our reasoning model:
+- Uses real text from Project Gutenberg (not random gibberish that triggers EOS).
+- Reports **TTFR** (time to first streamed chunk), which bypasses the `reasoning_content` accounting issue that under-counts visible tokens for `minimax_m2` reasoning parser.
+- Numbers are directly comparable to the forum's `pp2048` / `tg128` measurements.
 
 ```bash
-# Single-stream latency (comparable to scripts/benchmark.sh semantics)
-MAX_CONCURRENCY=1 NUM_PROMPTS=8 ./scripts/benchmark-serve.sh
+# Default: pp2048 / tg128 / depth=0 / 3 runs / concurrency=1 (forum baseline)
+./scripts/benchmark-llama-benchy.sh
 
-# Realistic concurrent load (e.g. 8 users, Poisson arrivals at 2 req/s)
-DATASET=sharegpt NUM_PROMPTS=64 REQUEST_RATE=2 ./scripts/benchmark-serve.sh
+# Depth sweep — measure how decode degrades with prefill context
+DEPTH="0 4096 8192 32768" ./scripts/benchmark-llama-benchy.sh
 
-# Saturation burst (default)
-./scripts/benchmark-serve.sh      # random workload, 32 prompts, burst
+# Concurrent decode throughput
+CONCURRENCY=8 ./scripts/benchmark-llama-benchy.sh
+
+# Raw JSON for parsing
+FORMAT=json ./scripts/benchmark-llama-benchy.sh > bench.json
 ```
-
-Two caveats for the **`random`** dataset on our reasoning model (M2.7):
-- `minimax_m2` reasoning parser routes most generation into `reasoning_content`; vLLM bench's `Total generated tokens` only counts visible `content`, so total-token throughput looks artificially low. **Mean ITL is the reliable metric** for raw per-stream decode speed.
-- Random gibberish prompts produce short visible responses. Default has `--ignore-eos` set, but that only keeps the *raw* generation going — visible content tokens stay scarce.
-
-Prefer `DATASET=sharegpt` for realistic concurrent-load measurement.
 
 OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`; copy it to `~/.config/opencode/opencode.json` and it just works.
 
@@ -136,6 +138,17 @@ All numbers are single-stream decode at batch 1, default benchmark prompt ("Writ
 | PP=2, TP=1 | 1.33 tok/s | 21.0 / 21.3 tok/s | Sustained ≈ 21 tok/s |
 
 **Winner: TP=2** by a hair. The StorageReview measurement that motivated PP=2 was on a Socket-fallback NCCL configuration; with real IB RDMA the per-token all-reduce stays cheap and the pipeline bubble for a 10B-active MoE at batch 1 costs more.
+
+### `llama-benchy` numbers (TP=2 locked, image pinned to vLLM v0.21.1rc0)
+
+Forum-comparable `pp/tg` measurement via `./scripts/benchmark-llama-benchy.sh` — defaults: pp2048, tg128, depth=0, runs=3, concurrency=1.
+
+| Recipe | pp2048 (tok/s) | tg128 (tok/s) | TTFR (ms) | Note |
+| --- | --- | --- | --- | --- |
+| **AWQ** *(default)* | 1150.38 ± 24.48 | **23.45 ± 0.07** | 1970 ± 38 | `cyankiwi/MiniMax-M2.7-AWQ-4bit` |
+| Forum reference (miken, same model, dual Spark + CX7) | 2900.93 ± 3.91 | 38.32 ± 0.03 | — | We're ~2.5× behind on prefill, ~1.6× on decode |
+
+The decode gap is genuine (not a methodology artifact — `llama-benchy` measures the same thing miken's `llama-bench`-comparable output measured). Likely contributors to investigate later: driver/firmware version, vLLM build SHA (we're pinned to v0.21.1rc0), NCCL collective settings, MTU verification on every cable in the 4-fabric mesh, possibly different `cyankiwi/...` checkpoint hash if it was re-quantized.
 
 ### Quant / backend bench (TP=2 locked, image pinned to vLLM v0.21.1rc0)
 
