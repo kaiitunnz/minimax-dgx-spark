@@ -131,7 +131,7 @@ vLLM's `minimax_m2` tool parser emits clean per-`<invoke>` deltas; OpenCode cons
 ./scripts/benchmark-llama-benchy.sh # llama-bench style pp/tg numbers
 ```
 
-See `docs/m2.7-dual-spark/runbook.md` for day-to-day ops, failure modes, and recovery procedures.
+A one-entry `CLUSTER_NODES` runs single-node automatically (TP=1, with a `cluster_only: false` recipe such as `recipes/example.dgxs1.yaml`); MiniMax M2.7 targets the dual-Spark setup. See `docs/m2.7-dual-spark/runbook.md` for day-to-day ops, single-node mode, failure modes, and recovery procedures.
 
 ## Troubleshooting
 
