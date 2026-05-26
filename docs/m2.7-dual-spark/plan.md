@@ -49,7 +49,22 @@ Tooling: `./scripts/verify-cluster.sh` runs all of the above against `docker/.en
 
 ### Phase 5 — Deferred (filed, not blocked on)
 
-- NVFP4 once vLLM #30163, #32826, #42516 resolve.
+- NVFP4 perf parity with AWQ — recipe is in-repo and runs, but `--moe-backend cutlass` measured at 14.7 tok/s vs AWQ's 22 tok/s. Next experiment is `--moe-backend flashinfer_cutlass` (per NVIDIA dev forum 366324). AWQ stays as default until NVFP4 closes the gap.
 - Expert parallel once stable on sm_120.
 - SGLang MTP speculative decode on worker if Phase 3 throughput < target.
 - Rebuild AWQ for M2.7 if `cyankiwi/MiniMax-M2.7-AWQ-4bit` quality is inadequate.
+
+### Phase 6 — NVFP4 recipe (kept as alternative)
+
+Added `recipes/minimax-m2.7-nvfp4.dgxs.yaml` and downloaded `lukealonso/MiniMax-M2.7-NVFP4` (135 GB) to both nodes. Benched two NVFP4 MoE backends:
+
+- `--moe-backend flashinfer_cutlass`: 17.8 tok/s (matches forum thread 366324's "ekkis profile" config)
+- `--moe-backend cutlass`: 14.7 tok/s
+
+Both lose to AWQ's 22 tok/s on this cluster. The recipe stays in-repo with the faster flashinfer_cutlass variant; run via:
+
+```bash
+RECIPE=recipes/minimax-m2.7-nvfp4.dgxs.yaml ./scripts/start.sh
+```
+
+Revisit when the underlying vLLM/driver path closes the gap.

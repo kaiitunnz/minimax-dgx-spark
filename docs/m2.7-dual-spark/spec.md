@@ -33,10 +33,7 @@ Run MiniMax M2.7 (AWQ-4bit) across 2× DGX Spark to serve an OpenAI-compatible A
 
 ## Deferred work (watch list)
 
-- **NVFP4 migration** once these resolve upstream:
-  - vLLM #30163 — cutlass FP4 GEMM on sm_120 returns Internal Error
-  - vLLM #32826 — `--enable-expert-parallel` + NVFP4 + sm_120 fails
-  - vLLM #42516 — pipeline parallel + NVFP4 fails on IntermediateTensors path
+- **NVFP4 perf parity with AWQ**: `lukealonso/MiniMax-M2.7-NVFP4` runs cleanly on this cluster as of 2026-05-26 — the earlier sm_120 blockers (#30163, #32826, #42516) no longer reproduce in the vLLM build eugr's image ships. But measured **17.8 tok/s (flashinfer_cutlass MoE) and 14.7 tok/s (cutlass MoE) vs AWQ's 22 tok/s**. The NVIDIA forum thread 366324 reports ≥24 tok/s with the same flashinfer_cutlass config — our gap is likely vLLM/driver/firmware-related. Both recipes are kept in-repo (`recipes/minimax-m2.7-{awq,nvfp4}.dgxs.yaml`); AWQ is the default until NVFP4 catches up.
 - **Expert parallelism** (`--enable-expert-parallel`) once stable on sm_120. Could unlock MoE-aware sharding.
 - **Speculative decoding** via SGLang MTP on the worker node if Phase 3 throughput is below target — proven +80% on 4-Spark Gemma in NVIDIA dev forum #370354.
 - **AWQ-of-M2.7 rebuild** if `cyankiwi/MiniMax-M2.7-AWQ-4bit` proves inadequate (it's a community quant, not from MiniMax).

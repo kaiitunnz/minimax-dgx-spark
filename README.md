@@ -156,7 +156,7 @@ See `docs/m2.7-dual-spark/runbook.md` (post-Phase-4) for day-to-day ops, failure
 
 - **Model**: [`MiniMaxAI/MiniMax-M2.7`](https://huggingface.co/MiniMaxAI/MiniMax-M2.7) (base weights, BF16/FP8)
 - **Quant**: AWQ-4bit (~140 GB across 2 nodes); exact HF repo pinned in `recipes/minimax-m2.7-awq.dgxs.yaml`
-- **Why AWQ over NVFP4**: NVFP4 on sm_120 is broken in vanilla vLLM (issues #30163, #32826, #42516). Revisit when upstream fixes land — tracked in `docs/m2.7-dual-spark/spec.md`.
+- **AWQ vs NVFP4**: NVFP4 (`lukealonso/MiniMax-M2.7-NVFP4`) does run on this cluster, but with `--moe-backend cutlass` it benches at ~14.7 tok/s vs AWQ's ~22 tok/s. Recipe kept at `recipes/minimax-m2.7-nvfp4.dgxs.yaml`; run via `RECIPE=… ./scripts/start.sh`. See `docs/m2.7-dual-spark/runbook.md` for the full bench.
 
 ## References
 

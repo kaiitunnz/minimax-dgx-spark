@@ -1,0 +1,60 @@
+# Recipe: MiniMax-M2.7-NVFP4 for dual-DGX-Spark (TP=2)
+#
+# NVFP4 is the FP4 quant tuned for NVIDIA Blackwell. On dual DGX Spark with
+# NCCL on real IB RDMA, TP=2 is the proven topology — same as our AWQ recipe.
+#
+# Source for the flag set: NVIDIA dev forum thread "MiniMax M2.7 NVFP4 recipe
+# / benchmarks" (366324). The community resolved earlier vLLM sm_120 issues
+# (#30163, #32826, #42516) by explicitly selecting backends rather than
+# relying on auto-detection:
+#   - --quantization modelopt_fp4    (instead of auto-detecting from config)
+#   - --attention-backend flashinfer (avoids the cutlass FP4 sm_120 path)
+#   - --moe-backend cutlass          (stable MoE kernels)
+#   - VLLM_NVFP4_GEMM_BACKEND=cutlass (env, pins GEMM path)
+#
+# Reported decode: ~25.7 tok/s vs our AWQ TP=2 baseline of ~22 tok/s.
+# Both numbers are single-stream batch 1.
+
+recipe_version: "1"
+name: MiniMax-M2.7-NVFP4-DGXSparkx2
+description: vLLM serving MiniMax-M2.7-NVFP4 across 2x DGX Spark via tensor parallelism
+
+model: lukealonso/MiniMax-M2.7-NVFP4
+container: vllm-node
+cluster_only: true
+mods: []
+
+env:
+  VLLM_NVFP4_GEMM_BACKEND: flashinfer-cutlass
+  VLLM_USE_FLASHINFER_MOE_FP4: 1
+  VLLM_ALLOW_LONG_MAX_MODEL_LEN: 1
+
+defaults:
+  port: 8080
+  host: 0.0.0.0
+  tensor_parallel: 2
+  gpu_memory_utilization: 0.85
+  max_model_len: 196608
+  max_num_seqs: 4
+  max_num_batched_tokens: 8192
+
+command: |
+  vllm serve lukealonso/MiniMax-M2.7-NVFP4 \
+      --trust-remote-code \
+      --port {port} \
+      --host {host} \
+      --gpu-memory-utilization {gpu_memory_utilization} \
+      -tp {tensor_parallel} \
+      --max-model-len {max_model_len} \
+      --max-num-seqs {max_num_seqs} \
+      --max-num-batched-tokens {max_num_batched_tokens} \
+      --quantization modelopt_fp4 \
+      --kv-cache-dtype fp8 \
+      --attention-backend flashinfer \
+      --moe-backend flashinfer_cutlass \
+      --enable-prefix-caching \
+      --distributed-executor-backend ray \
+      --load-format fastsafetensors \
+      --enable-auto-tool-choice \
+      --tool-call-parser minimax_m2 \
+      --reasoning-parser minimax_m2

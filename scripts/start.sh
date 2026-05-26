@@ -6,7 +6,7 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 readonly ENV_FILE="$PROJECT_DIR/docker/.env"
-readonly RECIPE="$PROJECT_DIR/recipes/minimax-m2.7-awq.dgxs.yaml"
+readonly RECIPE="${RECIPE:-$PROJECT_DIR/recipes/minimax-m2.7-awq.dgxs.yaml}"
 readonly RUN_RECIPE="$PROJECT_DIR/third_party/spark-vllm-docker/run-recipe.sh"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
