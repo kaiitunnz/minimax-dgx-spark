@@ -1,0 +1,40 @@
+# Recipe: MiniMax-M2.7-AWQ for dual-DGX-Spark (TP=2).
+# Overlay of 3rdparty/spark-vllm-docker/recipes/minimax-m2.7-awq.yaml.
+# Local overrides vs upstream:
+#   - port 8080         (matches OpenCode endpoint and tests/)
+#   - flashinfer attn   (+8% decode on this cluster)
+# See docs/m2.7-dual-spark/runbook.md for benchmark numbers.
+
+recipe_version: "1"
+name: MiniMax-M2.7-AWQ-DGXSparkx2
+description: vLLM serving MiniMax-M2.7-AWQ across 2x DGX Spark via tensor parallelism
+
+model: cyankiwi/MiniMax-M2.7-AWQ-4bit
+container: spark-vllm
+cluster_only: true
+mods: []
+
+defaults:
+  port: 8080
+  host: 0.0.0.0
+  tensor_parallel: 2
+  pipeline_parallel: 1
+  gpu_memory_utilization: 0.85
+  max_model_len: 196608
+
+env: {}
+
+command: |
+  vllm serve cyankiwi/MiniMax-M2.7-AWQ-4bit \
+      --trust-remote-code \
+      --port {port} \
+      --host {host} \
+      --gpu-memory-utilization {gpu_memory_utilization} \
+      -tp {tensor_parallel} \
+      --distributed-executor-backend ray \
+      --max-model-len {max_model_len} \
+      --load-format fastsafetensors \
+      --attention-backend flashinfer \
+      --enable-auto-tool-choice \
+      --tool-call-parser minimax_m2 \
+      --reasoning-parser minimax_m2

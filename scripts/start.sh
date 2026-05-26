@@ -1,44 +1,44 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# Boot the dual-DGX-Spark vLLM cluster with our recipe overlay.
+# Reads .env, invokes 3rdparty/spark-vllm-docker/run-recipe.sh.
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+readonly ENV_FILE="$PROJECT_DIR/.env"
+readonly RECIPE="${RECIPE:-$PROJECT_DIR/recipes/minimax-m2.7-awq.dgxs.yaml}"
+readonly RUN_RECIPE="$PROJECT_DIR/3rdparty/spark-vllm-docker/run-recipe.sh"
 
-echo "Starting MiniMax inference server..."
+# Default to daemon mode so vLLM output is reachable via `docker logs` and
+# `./scripts/tail-logs.sh`. Set FOREGROUND=1 to stream logs in this terminal
+# instead (cluster ties to the shell; `docker logs` stays empty).
+readonly FOREGROUND="${FOREGROUND:-0}"
 
-# Allow longer startup for large models
-STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-600}"
+die() { echo "ERROR: $*" >&2; exit 1; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-# Verify GPU is available
-if ! nvidia-smi &>/dev/null; then
-    echo "ERROR: nvidia-smi failed. Is GPU available?"
-    exit 1
+[[ -f "$ENV_FILE" ]]    || die "Missing $ENV_FILE — copy from .env.example and edit"
+[[ -f "$RECIPE" ]]      || die "Missing $RECIPE"
+[[ -x "$RUN_RECIPE" ]]  || die "Missing $RUN_RECIPE — did you run \`git submodule update --init\`?"
+
+# Sanity: confirm CLUSTER_NODES is set so we fail before docker churn.
+if ! grep -qE '^CLUSTER_NODES=.+,' "$ENV_FILE"; then
+  die "CLUSTER_NODES in $ENV_FILE must list at least two comma-separated nodes"
 fi
 
-# Verify model exists
-MODEL_FILE="$PROJECT_DIR/models/MiniMax-M2.1-REAP-40.Q6_K.gguf"
-if [[ ! -f "$MODEL_FILE" ]]; then
-    echo "ERROR: Model not found at $MODEL_FILE"
-    echo "Run: hf download mradermacher/MiniMax-M2.1-REAP-40-GGUF --include 'MiniMax-M2.1-REAP-40.Q6_K.gguf' --local-dir $PROJECT_DIR/models"
-    exit 1
-fi
+# Propagate HF_HOME from .env so the launcher's
+# `${HF_HOME:-$HOME/.cache/huggingface}` resolves consistently on both nodes
+# (SSH non-interactive sessions don't source .bashrc).
+hf_home_from_env=$(grep -E '^HF_HOME=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+[[ -n "$hf_home_from_env" ]] && export HF_HOME="$hf_home_from_env"
 
-# Start the server
-cd "$PROJECT_DIR/docker"
-docker compose up -d
+log "Booting cluster via $RUN_RECIPE"
+log "  config:  $ENV_FILE"
+log "  recipe:  $RECIPE"
+log "  HF_HOME: ${HF_HOME:-(unset, launcher will default to \$HOME/.cache/huggingface)}"
 
-echo "Waiting for server to be ready..."
-elapsed=0
-while [[ "$elapsed" -lt "$STARTUP_TIMEOUT" ]]; do
-    if curl -sf http://localhost:8080/health &>/dev/null; then
-        echo "Server is ready at http://localhost:8080"
-        echo "OpenAI-compatible API: http://localhost:8080/v1"
-        exit 0
-    fi
-    sleep 2
-    elapsed=$((elapsed + 2))
-done
+daemon_flag=(--daemon)
+[[ "$FOREGROUND" == "1" ]] && daemon_flag=()
+log "  mode:    $([[ ${#daemon_flag[@]} -gt 0 ]] && echo daemon || echo foreground)"
 
-echo "ERROR: Server failed to start within ${STARTUP_TIMEOUT} seconds"
-docker compose logs
-exit 1
+exec "$RUN_RECIPE" --config "$ENV_FILE" "${daemon_flag[@]}" "$RECIPE" "$@"

@@ -4,6 +4,7 @@ models/
 # Secrets and credentials
 .env
 .env.*
+!*.example
 *.pem
 *.key
 *.secret
