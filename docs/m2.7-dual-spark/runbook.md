@@ -61,7 +61,7 @@ RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
 SOLO=1 RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
 ```
 
-MiniMax M2.7 AWQ-4bit (≈122 GB engine-loaded) does not fit alongside KV + activations on a single 128 GB Spark; pick a smaller model.
+Pick a model whose weights fit in 128 GB.
 
 ### Benchmark tools
 
