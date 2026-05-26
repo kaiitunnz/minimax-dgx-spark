@@ -1,6 +1,6 @@
 # Example single-node DGX-Spark recipe (TP=1 / PP=1).
 # Use this as a template for any model whose weights fit in 128 GB.
-# Boot with:  SOLO=1 RECIPE=recipes/example-single-spark.yaml ./scripts/start.sh
+# Boot with:  SOLO=1 RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
 #
 # `cluster_only: false` is the key bit — the launcher's solo-mode guard rejects
 # recipes that hard-require Ray. TP=1 means no all-reduce, so no distributed

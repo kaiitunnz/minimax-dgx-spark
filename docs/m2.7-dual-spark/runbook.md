@@ -49,10 +49,10 @@ OpenCode points at `http://localhost:8080/v1` via `config/opencode.json.example`
 
 ### Single-node mode
 
-The wrapper scripts accept a single-entry `CLUSTER_NODES`. Combined with `SOLO=1`, the launcher skips Ray and runs the recipe on the local node only. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example-single-spark.yaml` is a template:
+The wrapper scripts accept a single-entry `CLUSTER_NODES`. Combined with `SOLO=1`, the launcher skips Ray and runs the recipe on the local node only. The recipe must set `cluster_only: false` (the dual-Spark MiniMax recipes do not — they require Ray). `recipes/example.dgxs1.yaml` is a template:
 
 ```bash
-SOLO=1 RECIPE=recipes/example-single-spark.yaml ./scripts/start.sh
+SOLO=1 RECIPE=recipes/example.dgxs1.yaml ./scripts/start.sh
 ```
 
 MiniMax M2.7 AWQ-4bit (≈122 GB engine-loaded) does not fit alongside KV + activations on a single 128 GB Spark; pick a smaller model.
