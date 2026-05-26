@@ -9,6 +9,11 @@ readonly ENV_FILE="$PROJECT_DIR/.env"
 readonly RECIPE="${RECIPE:-$PROJECT_DIR/recipes/minimax-m2.7-awq.dgxs.yaml}"
 readonly RUN_RECIPE="$PROJECT_DIR/3rdparty/spark-vllm-docker/run-recipe.sh"
 
+# Default to daemon mode so vLLM output is reachable via `docker logs` and
+# `./scripts/tail-logs.sh`. Set FOREGROUND=1 to stream logs in this terminal
+# instead (cluster ties to the shell; `docker logs` stays empty).
+readonly FOREGROUND="${FOREGROUND:-0}"
+
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
@@ -32,4 +37,8 @@ log "  config:  $ENV_FILE"
 log "  recipe:  $RECIPE"
 log "  HF_HOME: ${HF_HOME:-(unset, launcher will default to \$HOME/.cache/huggingface)}"
 
-exec "$RUN_RECIPE" --config "$ENV_FILE" "$RECIPE" "$@"
+daemon_flag=(--daemon)
+[[ "$FOREGROUND" == "1" ]] && daemon_flag=()
+log "  mode:    $([[ ${#daemon_flag[@]} -gt 0 ]] && echo daemon || echo foreground)"
+
+exec "$RUN_RECIPE" --config "$ENV_FILE" "${daemon_flag[@]}" "$RECIPE" "$@"
