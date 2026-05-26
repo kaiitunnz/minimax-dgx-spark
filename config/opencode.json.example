@@ -42,14 +42,14 @@
   "provider": {
     "vllm": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "vLLM (DGX Spark Cluster)",
+      "name": "vLLM",
       "options": {
         "baseURL": "http://localhost:8080/v1",
         "timeout": 300000
       },
       "models": {
         "cyankiwi/MiniMax-M2.7-AWQ-4bit": {
-          "name": "MiniMax M2.7 AWQ-4bit (vLLM TP=2)",
+          "name": "MiniMax M2.7 AWQ-4bit (vLLM)",
           "limit": {
             "context": 196608,
             "output": 8192
